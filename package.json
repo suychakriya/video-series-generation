@@ -1,0 +1,50 @@
+{
+  "name": "auto-story-video",
+  "version": "1.0.0",
+  "description": "Automated daily story video generator for Facebook and YouTube",
+  "main": "src/index.ts",
+  "scripts": {
+    "generate": "ts-node src/index.ts generate",
+    "post": "ts-node src/index.ts post",
+    "dev": "ts-node src/index.ts",
+    "test-video": "ts-node src/index.ts test-video",
+    "lint": "eslint 'src/**/*.{ts,tsx}'",
+    "lint:fix": "eslint 'src/**/*.{ts,tsx}' --fix",
+    "format": "prettier --write 'src/**/*.{ts,tsx}'"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "latest",
+    "@remotion/bundler": "^4.0.436",
+    "@remotion/core": "latest",
+    "@remotion/renderer": "latest",
+    "@remotion/tailwind": "^4.0.438",
+    "@supabase/supabase-js": "latest",
+    "autoprefixer": "^10.4.27",
+    "cloudinary": "latest",
+    "dotenv": "latest",
+    "edge-tts": "^1.0.1",
+    "elevenlabs": "latest",
+    "google-auth-library": "latest",
+    "googleapis": "latest",
+    "node-fetch": "2",
+    "postcss": "^8.5.8",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "remotion": "latest",
+    "sharp": "latest",
+    "tailwindcss": "^3.4.19"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/node-fetch": "2",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/parser": "^8.57.1",
+    "eslint": "^10.0.3",
+    "eslint-plugin-prettier": "^5.5.5",
+    "prettier": "^3.8.1",
+    "ts-node": "latest",
+    "typescript": "latest"
+  }
+}
