@@ -206,6 +206,17 @@ New lore every day.
   return { videoId: shortId, videoUrl: shortUrl };
 }
 
+export async function verifyPlaylistExists(playlistId: string): Promise<boolean> {
+  try {
+    const auth = createOAuthClient();
+    const youtube = google.youtube({ version: 'v3', auth });
+    const res = await youtube.playlists.list({ part: ['id'], id: [playlistId] });
+    return (res.data.items?.length ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function getOrCreatePlaylist(storyTitle: string, theme: Theme): Promise<string> {
   const auth = createOAuthClient();
   const youtube = google.youtube({ version: 'v3', auth });

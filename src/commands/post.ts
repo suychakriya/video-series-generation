@@ -9,6 +9,7 @@ import {
   markAsPosted,
   getAllPartUrls,
   getOrCreatePlaylist as dbGetOrCreatePlaylist,
+  deletePlaylistRecord,
   getPlaylistId,
   saveRunStats,
 } from '../database';
@@ -17,6 +18,7 @@ import { deleteVideoFiles, deleteFromDrive, downloadFromDrive } from '../storage
 import {
   uploadMainVideo,
   getOrCreatePlaylist as ytGetOrCreatePlaylist,
+  verifyPlaylistExists,
   updateVideoDescription,
   postPreviousPartsComment as ytPostPreviousPartsComment,
 } from '../youtube';
@@ -137,9 +139,15 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
       console.log('\nUploading to YouTube...');
 
       let playlistId = await getPlaylistId(story.story_id);
+      if (playlistId && !(await verifyPlaylistExists(playlistId))) {
+        console.log('  Playlist no longer exists on YouTube — recreating...');
+        await deletePlaylistRecord(story.story_id);
+        playlistId = null;
+      }
       if (!playlistId) {
         playlistId = await ytGetOrCreatePlaylist(story.title, theme);
         await dbGetOrCreatePlaylist(story.story_id, story.title, story.theme, playlistId);
+        console.log(`  Playlist created: ${playlistId}`);
       }
 
       const ytUploadResult = await uploadMainVideo(

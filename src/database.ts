@@ -182,6 +182,17 @@ export async function getOrCreatePlaylist(
   }
 }
 
+export async function deletePlaylistRecord(storyId: string): Promise<void> {
+  if (LOCAL_MODE) {
+    const db = require('./local-database');
+    const localDb = JSON.parse(require('fs').readFileSync(require('path').join(process.cwd(), 'temp', 'db.json'), 'utf-8'));
+    localDb.playlists = localDb.playlists.filter((p: any) => p.story_id !== storyId);
+    require('fs').writeFileSync(require('path').join(process.cwd(), 'temp', 'db.json'), JSON.stringify(localDb, null, 2));
+    return;
+  }
+  await supabase().from('youtube_playlists').delete().eq('story_id', storyId);
+}
+
 export async function getPlaylistId(storyId: string): Promise<string | null> {
   if (LOCAL_MODE) return local.getPlaylistIdLocal(storyId);
   const { data } = await supabase()

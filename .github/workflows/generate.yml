@@ -1,8 +1,6 @@
 name: Generate Story Videos
 
 on:
-  schedule:
-    - cron: '0 2 */4 * *'
   workflow_dispatch:
 
 jobs:
