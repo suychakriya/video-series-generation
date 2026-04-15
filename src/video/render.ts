@@ -1,10 +1,12 @@
 import { bundle } from '@remotion/bundler';
 import { enableTailwind } from '@remotion/tailwind';
 import { renderMedia, renderStill, selectComposition } from '@remotion/renderer';
+import type { FacebookVideoProps } from './FacebookVideo';
 import * as path from 'path';
 import * as fs from 'fs';
 import { Theme } from '../themes';
 import { StoryPart } from '../story';
+import { AudioTimings, getExactAudioDuration } from '../audio';
 
 const ROOT_ENTRY = path.join(process.cwd(), 'src', 'video', 'Root.tsx');
 
@@ -41,15 +43,6 @@ async function getBundleUrl(): Promise<string> {
   return cachedBundleUrl;
 }
 
-async function getAudioDurationSeconds(audioPath: string): Promise<number> {
-  try {
-    // Edge TTS outputs at 128kbps → 16000 bytes/sec
-    const stats = fs.statSync(audioPath);
-    return Math.ceil(stats.size / 16000);
-  } catch {
-    return 600;
-  }
-}
 
 export async function renderMainVideo(
   part: StoryPart,
@@ -58,88 +51,87 @@ export async function renderMainVideo(
   theme: Theme,
   storyId: string,
   storyTitle: string,
-  thumbnailPath: string
+  thumbnailPath: string,
+  hookImagePath: string,
+  timings: AudioTimings,
+  format: 'landscape' | 'facebook' = 'landscape'
 ): Promise<string> {
   const outputDir = path.join(process.cwd(), 'temp', storyId, `part_${part.part}`);
   fs.mkdirSync(outputDir, { recursive: true });
-  const outputPath = path.join(outputDir, 'main_video.mp4');
+  const outputPath = path.join(outputDir, format === 'facebook' ? 'main_video_facebook.mp4' : 'main_video.mp4');
 
-  const durationSeconds = await getAudioDurationSeconds(audioPath);
   const fps = 30;
-  const durationInFrames = (durationSeconds + 3) * fps;
+  const totalDurationSec =
+    timings.introDurationSec +
+    timings.sceneDurationsSec.reduce((a, b) => a + b, 0) +
+    timings.hookDurationSec +
+    timings.outroDurationSec;
+  const durationInFrames = Math.ceil(totalDurationSec * fps) + fps; // +1s buffer
   const serveUrl = await getBundleUrl();
 
   const themeForVideo = { colorTint: theme.colorTint, name: theme.name };
 
-  // Build clips array (scene clips + thumbnail for hook section)
-  const clips = imageResults.map((r) => ({
+  // Build clips: thumbnail (intro), scene images, thumbnail again (hook)
+  const clips: Array<{ src: string; isVideo: boolean }> = [];
+  clips.push({ src: toDataUri(thumbnailPath), isVideo: false }); // index 0 — intro
+  imageResults.forEach((r) => clips.push({
     src: r.isVideo ? toVideoDataUri(r.clipPath) : toDataUri(r.localPath),
     isVideo: r.isVideo,
   }));
-  // Thumbnail clip appended at end — used during hook narration
-  clips.push({ src: toDataUri(thumbnailPath), isVideo: false });
+  clips.push({ src: toDataUri(hookImagePath), isVideo: false }); // last — hook
 
-  // Build scene map: how many clips belong to each scene
-  const clipsPerScene = Math.ceil(clips.length / part.scenes.length);
-  const scenesData = part.scenes.map((s, i) => ({
+  // Scene metadata (1 image per scene)
+  const scenesData = part.scenes.map((s) => ({
     description: s.description,
     narration: s.narration,
-    imagesCount: i < part.scenes.length - 1
-      ? clipsPerScene
-      : clips.length - clipsPerScene * (part.scenes.length - 1) - 1, // -1 for thumbnail clip
+    imagesCount: 1,
   }));
 
-  // --- Proportional clip timing ---
-  // Match the branded text generated in audio.ts exactly so word-proportions are accurate
-  const brandedIntro = `Welcome to Untold Lores. "${storyTitle}" — Part ${part.part} of 4.`;
-  const brandedOutro = `That's it for Part ${part.part}. Follow Untold Lores for Part ${
-    part.part < 4 ? part.part + 1 : '1 of our next story'
-  }. Like and subscribe for daily stories.`;
+  // --- Exact clip timings from real audio durations ---
+  const introFrames = Math.round(timings.introDurationSec * fps);
+  const hookFrames = Math.round(timings.hookDurationSec * fps);
 
-  const introWords = brandedIntro.split(/\s+/).length;
-  const contentWords = part.content.split(/\s+/).length;
-  const hookWords = part.hook.split(/\s+/).length;
-  const outroWords = brandedOutro.split(/\s+/).length;
-  const totalWords = introWords + contentWords + hookWords + outroWords;
-
-  const introFrames = Math.round((introWords / totalWords) * durationInFrames);
-  const outroFrames = Math.round((outroWords / totalWords) * durationInFrames);
-  const hookFrames = Math.round((hookWords / totalWords) * durationInFrames);
-  const contentFrames = durationInFrames - introFrames - hookFrames - outroFrames;
-
-  // Each scene gets frames proportional to its narration word count — exact voice sync
-  const totalNarrationWords = part.scenes.reduce(
-    (sum, s) => sum + (s.narration ? s.narration.split(/\s+/).length : 1), 0
-  ) || contentWords; // fallback to content word count if narration missing
-
-  let sceneOffset = 0;
   const clipTimings: Array<{ startFrame: number; durationFrames: number }> = [];
-  for (let sceneIdx = 0; sceneIdx < part.scenes.length; sceneIdx++) {
-    const scene = part.scenes[sceneIdx];
-    const sceneNarrationWords = scene.narration
-      ? scene.narration.split(/\s+/).length
-      : Math.round(contentWords / part.scenes.length);
 
-    const sceneFrames = sceneIdx < part.scenes.length - 1
-      ? Math.round((sceneNarrationWords / totalNarrationWords) * contentFrames)
-      : contentFrames - sceneOffset; // last scene gets remainder to avoid rounding gaps
+  // Thumbnail during intro
+  clipTimings.push({ startFrame: 0, durationFrames: introFrames });
 
-    const sceneStart = introFrames + sceneOffset;
-    const sceneClipCount = scenesData[sceneIdx].imagesCount;
-
-    for (let j = 0; j < sceneClipCount; j++) {
-      const clipStart = sceneStart + Math.round((j / sceneClipCount) * sceneFrames);
-      const clipEnd = j < sceneClipCount - 1
-        ? sceneStart + Math.round(((j + 1) / sceneClipCount) * sceneFrames)
-        : sceneStart + sceneFrames;
-      clipTimings.push({ startFrame: clipStart, durationFrames: clipEnd - clipStart });
-    }
-
-    sceneOffset += sceneFrames;
+  // Scene clips — each exactly matches its narration audio duration
+  let sceneOffset = 0;
+  for (let i = 0; i < part.scenes.length; i++) {
+    const durationFrames = i < part.scenes.length - 1
+      ? Math.round(timings.sceneDurationsSec[i] * fps)
+      : Math.round(timings.sceneDurationsSec.reduce((a, b) => a + b, 0) * fps) - sceneOffset;
+    clipTimings.push({ startFrame: introFrames + sceneOffset, durationFrames });
+    sceneOffset += durationFrames;
   }
 
-  // Thumbnail shown during hook narration
-  clipTimings.push({ startFrame: introFrames + contentFrames, durationFrames: hookFrames });
+  // Thumbnail again during hook narration
+  clipTimings.push({ startFrame: introFrames + sceneOffset, durationFrames: hookFrames });
+
+  if (format === 'facebook') {
+    const fbInputProps: FacebookVideoProps = {
+      clips,
+      clipTimings,
+      audioSrc: toAudioDataUri(audioPath),
+      scenes: scenesData,
+      partNumber: part.part,
+      totalParts: 4,
+      theme: themeForVideo,
+      storyTitle,
+      hook: part.hook,
+    };
+    const composition = await selectComposition({ serveUrl, id: 'FacebookVideo', inputProps: fbInputProps as any });
+    await renderMedia({
+      composition: { ...composition, durationInFrames, width: 1080, height: 1350, fps },
+      serveUrl,
+      codec: 'h264',
+      outputLocation: outputPath,
+      inputProps: fbInputProps as any,
+    });
+    console.log(`  Facebook video rendered (1080x1350): ${outputPath}`);
+    return outputPath;
+  }
 
   const inputProps = {
     clips,
@@ -164,51 +156,10 @@ export async function renderMainVideo(
     inputProps,
   });
 
-  console.log(`  Main video rendered: ${outputPath}`);
+  console.log(`  Main video rendered (1920x1080): ${outputPath}`);
   return outputPath;
 }
 
-export async function renderShort(
-  part: StoryPart,
-  cliffhangerImages: string[],
-  shortAudioPath: string,
-  theme: Theme,
-  storyId: string
-): Promise<string> {
-  const outputDir = path.join(process.cwd(), 'temp', storyId, `part_${part.part}`);
-  fs.mkdirSync(outputDir, { recursive: true });
-  const outputPath = path.join(outputDir, 'short.mp4');
-
-  const durationSeconds = await getAudioDurationSeconds(shortAudioPath);
-  const fps = 30;
-  const durationInFrames = (durationSeconds + 2) * fps;
-  const serveUrl = await getBundleUrl();
-
-  const themeForShort = {
-    colorTint: theme.colorTint,
-    name: theme.name,
-    particleEffect: theme.particleEffect,
-  };
-  const inputProps = {
-    images: cliffhangerImages.map(toDataUri),
-    shortAudioSrc: toAudioDataUri(shortAudioPath),
-    hook: part.hook,
-    theme: themeForShort,
-  };
-
-  const composition = await selectComposition({ serveUrl, id: 'Short', inputProps });
-
-  await renderMedia({
-    composition: { ...composition, durationInFrames, width: 1080, height: 1920, fps },
-    serveUrl,
-    codec: 'h264',
-    outputLocation: outputPath,
-    inputProps,
-  });
-
-  console.log(`  Short rendered: ${outputPath}`);
-  return outputPath;
-}
 
 export async function renderThumbnail(
   part: StoryPart,

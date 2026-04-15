@@ -227,6 +227,40 @@ export async function getOrCreatePlaylist(storyTitle: string, theme: Theme): Pro
   return resp.data.id!;
 }
 
+export async function postPreviousPartsComment(
+  videoId: string,
+  previousParts: Array<{ part: number; url: string }>
+): Promise<void> {
+  if (!previousParts.length) return;
+
+  const auth = createOAuthClient();
+  const youtube = google.youtube({ version: 'v3', auth });
+
+  const lines = previousParts
+    .map((p) => `Part ${p.part}: ${p.url}`)
+    .join('\n');
+
+  const comment = `📚 Missed the beginning? Watch from the start:\n\n${lines}\n\n⚜️ Subscribe to Untold Lores for daily stories!`;
+
+  await retryWithBackoff(() =>
+    youtube.commentThreads.insert({
+      part: ['snippet'],
+      requestBody: {
+        snippet: {
+          videoId,
+          topLevelComment: {
+            snippet: {
+              textOriginal: comment,
+            },
+          },
+        },
+      },
+    })
+  );
+
+  console.log('  Previous parts comment posted on YouTube');
+}
+
 export async function updateVideoDescription(
   videoId: string,
   newDescription: string

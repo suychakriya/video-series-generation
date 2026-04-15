@@ -167,6 +167,45 @@ async function fetchPexelsImages(
   return paths;
 }
 
+export async function generateHookImage(
+  hook: string,
+  stylePrompt: string,
+  characterDescription: string,
+  imageSeed: number,
+  storyId: string,
+  partNumber: number
+): Promise<string> {
+  const outputDir = path.join(process.cwd(), 'temp', storyId, `part_${partNumber}`, 'images');
+  fs.mkdirSync(outputDir, { recursive: true });
+  const outputPath = path.join(outputDir, 'hook_image.jpg');
+
+  if (fs.existsSync(outputPath)) return outputPath;
+
+  const atmosphere = stylePrompt.split(',').slice(0, 5).join(',').trim();
+  const charPart = characterWeightForScene(hook, characterDescription);
+  const prompt = [
+    'donghua anime, cel shading, 2D illustration',
+    hook.slice(0, 250),
+    charPart,
+    atmosphere,
+    'cinematic composition, dramatic lighting, intense cliffhanger moment, masterpiece, highly detailed',
+  ].filter(Boolean).join(', ');
+
+  console.log(`  Generating hook image...`);
+  try {
+    if (LOCAL_MODEL_URL) {
+      await retryWithBackoff(() => generateLocalImage(prompt, imageSeed + 9999, outputPath));
+    } else {
+      await retryWithBackoff(() => generateHFImage(stylePrompt, hook, [], characterDescription, imageSeed + 9999, outputPath));
+    }
+    console.log(`  ✅ Hook image generated`);
+  } catch (err) {
+    console.log(`  ⚠️  Hook image failed: ${(err as Error).message}`);
+  }
+
+  return outputPath;
+}
+
 export async function fetchImagesForPart(
   partNumber: number,
   scenes: Array<{ scene_number: number; keywords: string[]; description: string }>,

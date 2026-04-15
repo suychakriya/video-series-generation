@@ -24,7 +24,6 @@ export interface FacebookPostResult {
 
 export async function postVideoToFacebook(
   videoPath: string,
-  thumbnailUrl: string,
   caption: string,
   title: string
 ): Promise<FacebookPostResult> {
@@ -90,7 +89,6 @@ export async function postVideoToFacebook(
         upload_session_id,
         description: caption,
         title,
-        thumb: thumbnailUrl,
         access_token: ACCESS_TOKEN,
         published: true,
       }),

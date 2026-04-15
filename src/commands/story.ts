@@ -1,0 +1,69 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+import { getThemeByIndex } from '../themes';
+import { generateFullStory } from '../story';
+import {
+  saveStoryPart,
+  getCurrentThemeIndex,
+  incrementThemeIndex,
+} from '../database';
+
+function generateStoryId(): string {
+  const date = new Date().toISOString().split('T')[0].replace(/-/g, '');
+  const rand = Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, '0');
+  return `story_${date}_${rand}`;
+}
+
+export async function runStory(): Promise<void> {
+  const storyId = generateStoryId();
+  console.log(`\nStarting story generation — ${storyId}`);
+
+  const themeIndex = await getCurrentThemeIndex();
+  const theme = getThemeByIndex(themeIndex);
+  console.log(`Theme: ${theme.name}`);
+
+  const story = await generateFullStory(theme, storyId);
+  console.log(`Story: "${story.overall_title}"`);
+
+  // Set post dates (one per day starting tomorrow)
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  for (let i = 0; i < story.parts.length; i++) {
+    const part = story.parts[i];
+    const postDate = new Date(tomorrow);
+    postDate.setDate(postDate.getDate() + i);
+    const postDateStr = postDate.toISOString().split('T')[0];
+
+    const recordId = await saveStoryPart({
+      story_id: story.story_id,
+      part: part.part,
+      theme: theme.id,
+      title: part.title,
+      content: part.content,
+      hook: part.hook,
+      thumbnail_title: part.thumbnail_title,
+      character_description: story.character_description,
+      style_prompt: story.style_prompt,
+      image_seed: story.image_seed,
+      facebook_caption: part.facebook_caption,
+      youtube_title: `${story.overall_title} - Part ${part.part}`,
+      youtube_description: part.youtube_description_hook,
+      youtube_tags: theme.youtubeTags,
+      post_date: postDateStr,
+      images_status: 'pending',
+      audio_status: 'pending',
+      video_status: 'pending',
+    });
+
+    console.log(`  Part ${part.part}/4 saved (id: ${recordId})`);
+  }
+
+  await incrementThemeIndex();
+
+  console.log(`\nStory saved to Supabase — story_id: ${story.story_id}`);
+  console.log(`Title: "${story.overall_title}"`);
+}

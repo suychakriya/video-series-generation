@@ -1,4 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import * as local from './local-database';
+
+const LOCAL_MODE = process.env.LOCAL_MODE === 'true';
 
 let _supabase: SupabaseClient | null = null;
 
@@ -28,6 +31,7 @@ export interface StoryRecord {
   audio_url?: string;
   short_audio_url?: string;
   video_url?: string;
+  facebook_video_url?: string;
   short_url?: string;
   thumbnail_url?: string;
   subtitle_url?: string;
@@ -46,16 +50,23 @@ export interface StoryRecord {
   comment_posted?: boolean;
   posted?: boolean;
   post_date?: string;
+  images_status?: 'pending' | 'done';
+  audio_status?: 'pending' | 'done';
+  video_status?: 'pending' | 'done';
+  video_path?: string;
+  facebook_video_path?: string;
+  thumbnail_path?: string;
 }
 
 export async function saveStoryPart(record: StoryRecord): Promise<string> {
+  if (LOCAL_MODE) return local.saveStoryPartLocal(record);
   const { data, error } = await supabase().from('stories').insert(record).select('id').single();
-
   if (error) throw new Error(`DB insert error: ${error.message}`);
   return data.id;
 }
 
 export async function updateStoryPart(id: string, updates: Partial<StoryRecord>): Promise<void> {
+  if (LOCAL_MODE) return local.updateStoryPartLocal(id, updates);
   const { error } = await supabase().from('stories').update(updates).eq('id', id);
   if (error) throw new Error(`DB update error: ${error.message}`);
 }
@@ -79,6 +90,11 @@ export async function saveShortUrl(
 }
 
 export async function getDramaticImageUrl(id: string): Promise<string | null> {
+  if (LOCAL_MODE) {
+    const db = require('./local-database');
+    const story = db.getLatestStoryLocal();
+    return story?.dramatic_image_url ?? null;
+  }
   const { data, error } = await supabase()
     .from('stories')
     .select('dramatic_image_url')
@@ -89,6 +105,7 @@ export async function getDramaticImageUrl(id: string): Promise<string | null> {
 }
 
 export async function getTodayStory(): Promise<StoryRecord | null> {
+  if (LOCAL_MODE) return local.getTodayStoryLocal();
   const today = new Date().toISOString().split('T')[0];
   const { data, error } = await supabase()
     .from('stories')
@@ -97,45 +114,44 @@ export async function getTodayStory(): Promise<StoryRecord | null> {
     .eq('posted', false)
     .limit(1)
     .single();
-
   if (error || !data) return null;
   return data as StoryRecord;
 }
 
 export async function markAsPosted(id: string): Promise<void> {
+  if (LOCAL_MODE) return local.markAsPostedLocal(id);
   await updateStoryPart(id, { posted: true });
 }
 
 export async function getAllPartUrls(
   storyId: string
 ): Promise<Array<{ part: number; youtube_video_url?: string; youtube_video_id?: string }>> {
+  if (LOCAL_MODE) return local.getAllPartUrlsLocal(storyId);
   const { data, error } = await supabase()
     .from('stories')
     .select('part, youtube_video_url, youtube_video_id')
     .eq('story_id', storyId)
     .order('part');
-
   if (error) return [];
   return data || [];
 }
 
 export async function getCurrentThemeIndex(): Promise<number> {
+  if (LOCAL_MODE) return local.getCurrentThemeIndexLocal();
   const { data, error } = await supabase()
     .from('theme_tracker')
     .select('current_theme_index')
     .limit(1)
     .single();
-
   if (error || !data) return 0;
   return data.current_theme_index;
 }
 
 export async function incrementThemeIndex(): Promise<void> {
+  if (LOCAL_MODE) return local.incrementThemeIndexLocal();
   const current = await getCurrentThemeIndex();
   const next = (current + 1) % 5;
-
   const { data } = await supabase().from('theme_tracker').select('id').limit(1).single();
-
   if (data?.id) {
     await supabase()
       .from('theme_tracker')
@@ -150,12 +166,12 @@ export async function getOrCreatePlaylist(
   theme: string,
   playlistId: string
 ): Promise<void> {
+  if (LOCAL_MODE) return local.getOrCreatePlaylistLocal(storyId, storyTitle, theme, playlistId);
   const existing = await supabase()
     .from('youtube_playlists')
     .select('id')
     .eq('story_id', storyId)
     .single();
-
   if (!existing.data) {
     await supabase().from('youtube_playlists').insert({
       story_id: storyId,
@@ -167,12 +183,46 @@ export async function getOrCreatePlaylist(
 }
 
 export async function getPlaylistId(storyId: string): Promise<string | null> {
+  if (LOCAL_MODE) return local.getPlaylistIdLocal(storyId);
   const { data } = await supabase()
     .from('youtube_playlists')
     .select('playlist_id')
     .eq('story_id', storyId)
     .single();
   return data?.playlist_id || null;
+}
+
+export async function getLatestStory(): Promise<StoryRecord | null> {
+  if (LOCAL_MODE) return local.getLatestStoryLocal();
+  const { data, error } = await supabase()
+    .from('stories')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  if (error || !data) return null;
+  return data as StoryRecord;
+}
+
+export async function getStoryPart(storyId: string, part: number): Promise<StoryRecord | null> {
+  if (LOCAL_MODE) return local.getStoryPartLocal(storyId, part);
+  const { data, error } = await supabase()
+    .from('stories')
+    .select('*')
+    .eq('story_id', storyId)
+    .eq('part', part)
+    .single();
+  if (error || !data) return null;
+  return data as StoryRecord;
+}
+
+export async function updatePartStatus(
+  id: string,
+  updates: Partial<Pick<StoryRecord, 'images_status' | 'audio_status' | 'video_status' | 'video_path' | 'facebook_video_path' | 'thumbnail_path'>>
+): Promise<void> {
+  if (LOCAL_MODE) return local.updatePartStatusLocal(id, updates);
+  const { error } = await supabase().from('stories').update(updates).eq('id', id);
+  if (error) throw new Error(`DB update error: ${error.message}`);
 }
 
 export async function saveRunStats(stats: {
@@ -188,5 +238,6 @@ export async function saveRunStats(stats: {
   youtube_short_status?: string;
   error_message?: string;
 }): Promise<void> {
+  if (LOCAL_MODE) return local.saveRunStatsLocal(stats);
   await supabase().from('run_stats').insert(stats);
 }

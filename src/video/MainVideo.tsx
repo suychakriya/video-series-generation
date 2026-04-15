@@ -27,22 +27,34 @@ export interface MainVideoProps {
 }
 
 const WaterMark: React.FC = () => (
-  <div className="absolute top-6 left-8 flex items-center gap-2 bg-black/60 px-4 py-2 rounded-lg z-10"
-    style={{ fontFamily: "'Cinzel', serif", color: '#FFD700', fontSize: 22, fontWeight: 700, letterSpacing: 2 }}
+  <div
+    className="absolute top-6 left-8 flex items-center gap-2 bg-black/60 px-4 py-2 rounded-lg z-10"
+    style={{
+      fontFamily: "'Cinzel', serif",
+      color: '#FFD700',
+      fontSize: 22,
+      fontWeight: 700,
+      letterSpacing: 2,
+    }}
   >
     ⚜️ UNTOLD LORES
   </div>
 );
 
 const PartBadge: React.FC<{ part: number; total: number }> = ({ part, total }) => (
-  <div className="absolute top-6 right-8 bg-yellow-400/85 text-black px-5 py-2 rounded-lg z-10"
+  <div
+    className="absolute top-6 right-8 bg-yellow-400/85 text-black px-5 py-2 rounded-lg z-10"
     style={{ fontFamily: "'Cinzel', serif", fontWeight: 700, fontSize: 20 }}
   >
     Part {part} of {total}
   </div>
 );
 
-const KenBurnsImage: React.FC<{ src: string; index: number; duration: number }> = ({ src, index, duration }) => {
+const KenBurnsImage: React.FC<{ src: string; index: number; duration: number }> = ({
+  src,
+  index,
+  duration,
+}) => {
   const frame = useCurrentFrame();
   const progress = Math.min(frame / duration, 1);
   const scale = interpolate(progress, [0, 1], [1.0, 1.08]);
@@ -61,7 +73,9 @@ const KenBurnsImage: React.FC<{ src: string; index: number; duration: number }> 
 
 const AIDisclosureCard: React.FC = () => {
   const frame = useCurrentFrame();
-  const opacity = interpolate(frame, [0, 10, 100, 120], [0, 1, 1, 0], { extrapolateRight: 'clamp' });
+  const opacity = interpolate(frame, [0, 10, 100, 120], [0, 1, 1, 0], {
+    extrapolateRight: 'clamp',
+  });
   return (
     <div
       className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-black/75 text-white text-lg px-7 py-2.5 rounded-lg z-20 whitespace-nowrap"
@@ -73,8 +87,16 @@ const AIDisclosureCard: React.FC = () => {
 };
 
 export const MainVideo: React.FC<MainVideoProps> = ({
-  clips, clipTimings, audioSrc, content, scenes,
-  partNumber, totalParts, theme, storyTitle, hook,
+  clips,
+  clipTimings,
+  audioSrc,
+  content,
+  scenes,
+  partNumber,
+  totalParts,
+  theme,
+  storyTitle,
+  hook,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -93,14 +115,15 @@ export const MainVideo: React.FC<MainVideoProps> = ({
   const currentClipDuration = currentClipTiming?.durationFrames ?? fps * 10;
 
   const sceneCaption = React.useMemo(() => {
-    if (!scenes || scenes.length === 0) return '';
-    let count = 0;
-    for (const scene of scenes) {
-      count += scene.imagesCount;
-      if (currentImageIndex < count) return scene.narration;
+    // index 0 = intro thumbnail, indices 1..N = scenes, last = hook
+    if (currentImageIndex === 0) {
+      return `Welcome to Untold Lores. "${storyTitle}" — Part ${partNumber} of 4.`;
     }
-    return scenes[scenes.length - 1].narration;
-  }, [currentImageIndex, scenes]);
+    if (!scenes || scenes.length === 0) return '';
+    const sceneIdx = currentImageIndex - 1; // shift by 1 to skip intro clip
+    if (sceneIdx < scenes.length) return scenes[sceneIdx].narration;
+    return '';
+  }, [currentImageIndex, scenes, storyTitle, partNumber]);
 
   const captionFadeFrames = fps * 0.5;
   const captionOpacity = interpolate(
@@ -110,13 +133,8 @@ export const MainVideo: React.FC<MainVideoProps> = ({
     { extrapolateRight: 'clamp' }
   );
 
-  const words = content.split(' ');
-  const wordsPerFrame = words.length / durationInFrames;
-  const currentWordIndex = Math.min(Math.floor(frame * wordsPerFrame * 12), words.length - 1);
-  const displayWords = words.slice(Math.max(0, currentWordIndex - 11), currentWordIndex + 1);
-
-  const isNearEnd = frame > durationInFrames - fps * 8;
-  const hookPulse = isNearEnd
+  const isHookClip = currentImageIndex === clips.length - 1;
+  const hookPulse = isHookClip
     ? interpolate(frame % (fps * 0.8), [0, fps * 0.4, fps * 0.8], [0.95, 1.05, 0.95])
     : 1;
   const isLastSection = frame > durationInFrames - fps * 5;
@@ -141,7 +159,12 @@ export const MainVideo: React.FC<MainVideoProps> = ({
           <div key={i} className="absolute inset-0" style={{ opacity }}>
             <Sequence from={startFrame} durationInFrames={durationFrames} layout="none">
               {clip.isVideo ? (
-                <Video src={clip.src} className="w-full h-full object-cover" playbackRate={1} volume={0} />
+                <Video
+                  src={clip.src}
+                  className="w-full h-full object-cover"
+                  playbackRate={1}
+                  volume={0}
+                />
               ) : (
                 <KenBurnsImage src={clip.src} index={i} duration={durationFrames} />
               )}
@@ -154,7 +177,11 @@ export const MainVideo: React.FC<MainVideoProps> = ({
       <AbsoluteFill style={{ background: theme.colorTint }} />
 
       {/* Vignette */}
-      <AbsoluteFill style={{ background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%)' }} />
+      <AbsoluteFill
+        style={{
+          background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%)',
+        }}
+      />
 
       {/* AI Disclosure */}
       {frame < fps * 4 && <AIDisclosureCard />}
@@ -163,37 +190,36 @@ export const MainVideo: React.FC<MainVideoProps> = ({
       <PartBadge part={partNumber} total={totalParts} />
 
       {/* Scene narration caption */}
-      {!isNearEnd && !isLastSection && sceneCaption && (
+      {!isHookClip && !isLastSection && sceneCaption && (
         <div
-          className="absolute top-20 left-0 right-0 text-center bg-black/65 px-12 py-2.5 z-[8]"
+          className="absolute bottom-20 left-0 right-0 text-center bg-black/65 px-12 py-2.5 z-[8]"
           style={{ opacity: captionOpacity }}
         >
           <p
-            className="text-xl font-semibold tracking-wide"
-            style={{ fontFamily: "'Cinzel', serif", color: '#FFD700', textShadow: '0 1px 6px rgba(0,0,0,1)' }}
+            className="text-4xl font-semibold tracking-wide"
+            style={{
+              fontFamily: "'Cinzel', serif",
+              color: '#FFD700',
+              textShadow: '0 1px 6px rgba(0,0,0,1)',
+            }}
           >
             {sceneCaption}
           </p>
         </div>
       )}
 
-      {/* Story text */}
-      {!isNearEnd && !isLastSection && (
-        <div
-          className="absolute bottom-24 left-20 right-20 text-center bg-black/45 px-6 py-4 rounded-lg"
-          style={{ fontFamily: "'Cinzel', serif", color: '#fff', fontSize: 28, lineHeight: 1.6, textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}
-        >
-          {displayWords.join(' ')}
-        </div>
-      )}
-
       {/* Hook — pulsing near end */}
-      {isNearEnd && !isLastSection && (
+      {isHookClip && !isLastSection && (
         <div
           className="absolute bottom-28 left-20 right-20 text-center"
           style={{
-            fontFamily: "'Cinzel', serif", color: '#FFD700', fontSize: 32, fontWeight: 700,
-            lineHeight: 1.5, textShadow: '0 2px 12px rgba(0,0,0,1)', transform: `scale(${hookPulse})`,
+            fontFamily: "'Cinzel', serif",
+            color: '#FFD700',
+            fontSize: 36,
+            fontWeight: 700,
+            lineHeight: 1.5,
+            textShadow: '0 2px 12px rgba(0,0,0,1)',
+            transform: `scale(${hookPulse})`,
           }}
         >
           {hook}

@@ -4,6 +4,7 @@ import { Composition, registerRoot } from 'remotion';
 import { MainVideo } from './MainVideo';
 import { Short } from './Short';
 import { Thumbnail } from './Thumbnail';
+import { FacebookVideo } from './FacebookVideo';
 
 const RemotionRoot: React.FC = () => {
   return (
@@ -40,6 +41,25 @@ const RemotionRoot: React.FC = () => {
           shortAudioSrc: '',
           hook: '',
           theme: { colorTint: 'rgba(0,0,0,0.2)', name: 'Horror', particleEffect: 'dust' },
+        }}
+      />
+      <Composition
+        id="FacebookVideo"
+        component={FacebookVideo as unknown as React.FC<Record<string, unknown>>}
+        durationInFrames={18000}
+        fps={30}
+        width={1080}
+        height={1350}
+        defaultProps={{
+          clips: [],
+          clipTimings: [],
+          audioSrc: '',
+          scenes: [],
+          partNumber: 1,
+          totalParts: 4,
+          theme: { colorTint: 'rgba(0,0,0,0.2)', name: 'Horror' },
+          storyTitle: '',
+          hook: '',
         }}
       />
       <Composition

@@ -1,15 +1,26 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { execFile } from 'child_process';
+import { execFile, exec } from 'child_process';
 import { promisify } from 'util';
 import fetch from 'node-fetch';
 import { Theme } from './themes';
+import { StoryPart } from './story';
 
 const execFileAsync = promisify(execFile);
+const _exec = promisify(exec);
 
-// Best free male voices for narration (Edge TTS)
-// Full list: run `npx edge-tts --list-voices`
-const EDGE_VOICE = 'en-US-GuyNeural'; // Deep male narrator voice
+// Include Homebrew and common bin paths so ffmpeg/ffprobe are found on macOS and Linux
+const execAsync = (cmd: string) =>
+  _exec(cmd, { env: { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:${process.env.PATH}` } });
+
+const EDGE_VOICE = 'en-US-GuyNeural';
+
+export interface AudioTimings {
+  introDurationSec: number;
+  sceneDurationsSec: number[];
+  hookDurationSec: number;
+  outroDurationSec: number;
+}
 
 async function retryWithBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   for (let i = 0; i < maxRetries; i++) {
@@ -23,8 +34,25 @@ async function retryWithBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promis
   throw new Error('Max retries exceeded');
 }
 
-// PRIMARY: Edge TTS — free, no API key, high quality neural voice
-// Uses a .mjs helper to cross the CJS/ESM boundary
+// Get exact audio duration in seconds using ffprobe
+export async function getExactAudioDuration(audioPath: string): Promise<number> {
+  const { stdout } = await execAsync(
+    `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`
+  );
+  return parseFloat(stdout.trim());
+}
+
+// Concatenate multiple audio files into one using ffmpeg
+async function concatenateAudios(audioPaths: string[], outputPath: string): Promise<void> {
+  const listPath = outputPath + '.list.txt';
+  fs.writeFileSync(listPath, audioPaths.map((p) => `file '${p}'`).join('\n'));
+  try {
+    await execAsync(`ffmpeg -f concat -safe 0 -i "${listPath}" -c copy -y "${outputPath}"`);
+  } finally {
+    if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
+  }
+}
+
 async function generateEdgeAudio(
   text: string,
   outputPath: string,
@@ -41,7 +69,6 @@ async function generateEdgeAudio(
   }
 }
 
-// OPTIONAL UPGRADE: ElevenLabs — paid, best quality
 async function generateElevenLabsAudio(
   text: string,
   outputPath: string,
@@ -63,18 +90,21 @@ async function generateElevenLabsAudio(
       voice_settings: { stability, similarity_boost: similarityBoost, style, use_speaker_boost: true },
     }),
   });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`ElevenLabs error ${response.status}: ${errText}`);
-  }
-  const buffer = await response.buffer();
-  fs.writeFileSync(outputPath, buffer);
+  if (!response.ok) throw new Error(`ElevenLabs error ${response.status}: ${await response.text()}`);
+  fs.writeFileSync(outputPath, await response.buffer());
 }
 
-// LAST RESORT: HuggingFace TTS
+// macOS built-in TTS — free, offline, no API key needed
+// Uses exec (shell) so it picks up Homebrew PATH for ffmpeg
+async function generateMacOSAudio(text: string, outputPath: string): Promise<void> {
+  const aiffPath = outputPath.replace('.mp3', '.aiff');
+  const safeText = text.replace(/"/g, '\\"').replace(/`/g, '\\`');
+  await execAsync(`say -v Alex -r 150 -o "${aiffPath}" "${safeText}"`);
+  await execAsync(`ffmpeg -i "${aiffPath}" -codec:a libmp3lame -qscale:a 2 -y "${outputPath}"`);
+  if (fs.existsSync(aiffPath)) fs.unlinkSync(aiffPath);
+}
+
 async function generateHFFallbackAudio(text: string, outputPath: string): Promise<void> {
-  const truncated = text.slice(0, 500);
   const response = await fetch(
     'https://router.huggingface.co/hf-inference/models/facebook/mms-tts-eng',
     {
@@ -83,81 +113,116 @@ async function generateHFFallbackAudio(text: string, outputPath: string): Promis
         Authorization: `Bearer ${process.env.HUGGINGFACE_API_TOKEN}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ inputs: truncated }),
+      body: JSON.stringify({ inputs: text.slice(0, 500) }),
     }
   );
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`HF TTS error ${response.status}: ${errText}`);
-  }
-  const buffer = await response.buffer();
-  fs.writeFileSync(outputPath, buffer);
+  if (!response.ok) throw new Error(`HF TTS error ${response.status}: ${await response.text()}`);
+  fs.writeFileSync(outputPath, await response.buffer());
 }
 
-async function generateAudio(
-  text: string,
-  outputPath: string,
-  isShort = false
-): Promise<void> {
-  // 1. Try ElevenLabs if key is set and user has paid plan
+async function generateAudio(text: string, outputPath: string, isShort = false): Promise<void> {
   if (process.env.ELEVENLABS_API_KEY) {
     try {
-      const stability = isShort ? 0.2 : 0.5;
-      const style = isShort ? 1.0 : 0.5;
       await retryWithBackoff(() =>
-        generateElevenLabsAudio(text, outputPath, stability, 0.75, style)
+        generateElevenLabsAudio(text, outputPath, isShort ? 0.2 : 0.5, 0.75, isShort ? 1.0 : 0.5)
       );
-      console.log('  Audio generated via ElevenLabs ✅');
       return;
     } catch (err) {
       console.log(`  ElevenLabs failed: ${(err as Error).message}`);
     }
   }
-
-  // 2. Edge TTS — free, no API key needed
   try {
-    // Slower rate for dramatic narration, lower pitch for deep male voice
-    const rate = isShort ? '-10%' : '-5%';
-    const pitch = '-10Hz';
-    await retryWithBackoff(() => generateEdgeAudio(text, outputPath, rate, pitch));
-    console.log('  Audio generated via Edge TTS ✅');
+    await retryWithBackoff(() => generateEdgeAudio(text, outputPath, isShort ? '-10%' : '-5%', '-10Hz'));
     return;
   } catch (err) {
     console.log(`  Edge TTS failed: ${(err as Error).message}`);
   }
 
-  // 3. HuggingFace last resort
+  // macOS built-in say — free, offline
   try {
-    await retryWithBackoff(() => generateHFFallbackAudio(text, outputPath));
-    console.log('  Audio generated via HuggingFace TTS ✅');
+    await generateMacOSAudio(text, outputPath);
+    console.log('  Audio generated via macOS say ✅');
+    return;
   } catch (err) {
-    throw new Error(`All TTS providers failed. Last error: ${(err as Error).message}`);
+    console.log(`  macOS say failed: ${(err as Error).message}`);
   }
+
+  await retryWithBackoff(() => generateHFFallbackAudio(text, outputPath));
 }
 
 export async function generateMainAudio(
-  content: string,
-  hook: string,
-  partNumber: number,
+  part: StoryPart,
   theme: Theme,
   storyTitle: string,
   storyId: string
-): Promise<string> {
-  const outputDir = path.join(process.cwd(), 'temp', storyId, `part_${partNumber}`);
-  fs.mkdirSync(outputDir, { recursive: true });
-  const outputPath = path.join(outputDir, 'narration.mp3');
+): Promise<{ audioPath: string; timings: AudioTimings }> {
+  const outputDir = path.join(process.cwd(), 'temp', storyId, `part_${part.part}`);
+  const sceneAudioDir = path.join(outputDir, 'scene_audios');
+  fs.mkdirSync(sceneAudioDir, { recursive: true });
 
-  const brandedIntro = `Welcome to Untold Lores. "${storyTitle}" — Part ${partNumber} of 4.`;
-  const brandedOutro = `That's it for Part ${partNumber}. Follow Untold Lores for Part ${
-    partNumber < 4 ? partNumber + 1 : '1 of our next story'
+  const brandedIntro = `Welcome to Untold Lores. "${storyTitle}" — Part ${part.part} of 4.`;
+  const brandedOutro = `That's it for Part ${part.part}. Follow Untold Lores for Part ${
+    part.part < 4 ? part.part + 1 : '1 of our next story'
   }. Like and subscribe for daily stories.`;
 
-  const fullText = `${brandedIntro}\n\n${content}\n\n${hook}\n\n${brandedOutro}`;
-  console.log(`  Generating main audio (${fullText.length} chars)...`);
+  const allAudioPaths: string[] = [];
 
-  await generateAudio(fullText, outputPath, false);
-  return outputPath;
+  // 1. Intro
+  const introPath = path.join(sceneAudioDir, 'intro.mp3');
+  if (!fs.existsSync(introPath)) {
+    console.log(`  Generating intro audio...`);
+    await generateAudio(brandedIntro, introPath);
+  }
+  allAudioPaths.push(introPath);
+
+  // 2. Per-scene narration
+  const scenePaths: string[] = [];
+  for (let i = 0; i < part.scenes.length; i++) {
+    const scene = part.scenes[i];
+    const scenePath = path.join(sceneAudioDir, `scene_${scene.scene_number}.mp3`);
+    if (!fs.existsSync(scenePath)) {
+      console.log(`  Generating scene ${scene.scene_number}/${part.scenes.length} audio...`);
+      await generateAudio(scene.narration, scenePath);
+    }
+    scenePaths.push(scenePath);
+    allAudioPaths.push(scenePath);
+  }
+
+  // 3. Hook
+  const hookPath = path.join(sceneAudioDir, 'hook.mp3');
+  if (!fs.existsSync(hookPath)) {
+    console.log(`  Generating hook audio...`);
+    await generateAudio(part.hook, hookPath);
+  }
+  allAudioPaths.push(hookPath);
+
+  // 4. Outro
+  const outroPath = path.join(sceneAudioDir, 'outro.mp3');
+  if (!fs.existsSync(outroPath)) {
+    console.log(`  Generating outro audio...`);
+    await generateAudio(brandedOutro, outroPath);
+  }
+  allAudioPaths.push(outroPath);
+
+  // 5. Concatenate all into final narration.mp3
+  const audioPath = path.join(outputDir, 'narration.mp3');
+  console.log(`  Concatenating ${allAudioPaths.length} audio segments...`);
+  await concatenateAudios(allAudioPaths, audioPath);
+
+  // 6. Measure exact durations
+  const introDurationSec = await getExactAudioDuration(introPath);
+  const sceneDurationsSec = await Promise.all(scenePaths.map(getExactAudioDuration));
+  const hookDurationSec = await getExactAudioDuration(hookPath);
+  const outroDurationSec = await getExactAudioDuration(outroPath);
+
+  const timings: AudioTimings = { introDurationSec, sceneDurationsSec, hookDurationSec, outroDurationSec };
+
+  // 7. Cache timings to disk for --reuse
+  const timingsPath = path.join(outputDir, 'timings.json');
+  fs.writeFileSync(timingsPath, JSON.stringify(timings, null, 2));
+
+  console.log(`  ✅ Audio ready — intro: ${introDurationSec.toFixed(1)}s, ${part.scenes.length} scenes, hook: ${hookDurationSec.toFixed(1)}s`);
+  return { audioPath, timings };
 }
 
 export async function generateShortAudio(
@@ -172,7 +237,6 @@ export async function generateShortAudio(
 
   const fullText = `${theme.leadIn} ${hook} Find out what happens next... Follow Untold Lores.`;
   console.log(`  Generating short audio (hook line)...`);
-
   await generateAudio(fullText, outputPath, true);
   return outputPath;
 }

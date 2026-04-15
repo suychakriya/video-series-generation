@@ -1,12 +1,17 @@
-import { v2 as cloudinary } from 'cloudinary';
+import { google } from 'googleapis';
 import * as fs from 'fs';
 import * as path from 'path';
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
-  api_key: process.env.CLOUDINARY_API_KEY!,
-  api_secret: process.env.CLOUDINARY_API_SECRET!,
-});
+const LOCAL_MODE = process.env.LOCAL_MODE === 'true';
+
+function getDriveClient() {
+  const auth = new google.auth.OAuth2(
+    process.env.YOUTUBE_CLIENT_ID,
+    process.env.YOUTUBE_CLIENT_SECRET,
+  );
+  auth.setCredentials({ refresh_token: process.env.YOUTUBE_REFRESH_TOKEN });
+  return google.drive({ version: 'v3', auth });
+}
 
 async function retryWithBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   for (let i = 0; i < maxRetries; i++) {
@@ -20,132 +25,98 @@ async function retryWithBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promis
   throw new Error('Max retries exceeded');
 }
 
+async function uploadToDrive(
+  localPath: string,
+  fileName: string,
+  mimeType: string,
+): Promise<string> {
+  const drive = getDriveClient();
+  const sizeMB = (fs.statSync(localPath).size / 1024 / 1024).toFixed(1);
+  console.log(`  Uploading ${fileName} to Google Drive... (${sizeMB} MB)`);
+
+  const requestBody: any = { name: fileName };
+  if (process.env.GOOGLE_DRIVE_FOLDER_ID) {
+    requestBody.parents = [process.env.GOOGLE_DRIVE_FOLDER_ID];
+  }
+
+  const res = await retryWithBackoff(() =>
+    drive.files.create({
+      requestBody,
+      media: { mimeType, body: fs.createReadStream(localPath) },
+      fields: 'id',
+    })
+  );
+
+  const fileId = res.data.id!;
+
+  // Make publicly readable
+  await drive.permissions.create({
+    fileId,
+    requestBody: { role: 'reader', type: 'anyone' },
+  });
+
+  return `https://drive.google.com/file/d/${fileId}`;
+}
+
 export async function uploadVideo(
   localPath: string,
   storyId: string,
   partNumber: number,
-  type: 'main_video' | 'short'
+  type: 'main_video' | 'facebook_video' | 'short'
 ): Promise<string> {
-  const publicId = `stories/${storyId}/part_${partNumber}/${type}`;
-  console.log(`  Uploading ${type} to Cloudinary...`);
-
-  const result = await retryWithBackoff(() =>
-    cloudinary.uploader.upload(localPath, {
-      resource_type: 'video',
-      public_id: publicId,
-      overwrite: true,
-      timeout: 600000,
-    })
-  );
-
-  return result.secure_url;
+  if (LOCAL_MODE) {
+    console.log(`  LOCAL_MODE: skipping upload for ${type}`);
+    return localPath;
+  }
+  const fileName = `${storyId}_part${partNumber}_${type}.mp4`;
+  return uploadToDrive(localPath, fileName, 'video/mp4');
 }
 
 export async function uploadThumbnail(
   localPath: string,
   storyId: string,
-  partNumber: number
-): Promise<string> {
-  const publicId = `stories/${storyId}/part_${partNumber}/thumbnail`;
-
-  const result = await retryWithBackoff(() =>
-    cloudinary.uploader.upload(localPath, {
-      resource_type: 'image',
-      public_id: publicId,
-      overwrite: true,
-    })
-  );
-
-  return result.secure_url;
-}
-
-export async function uploadAudio(
-  localPath: string,
-  storyId: string,
   partNumber: number,
-  type: 'narration' | 'short_narration'
 ): Promise<string> {
-  const publicId = `stories/${storyId}/part_${partNumber}/${type}`;
-
-  const result = await retryWithBackoff(() =>
-    cloudinary.uploader.upload(localPath, {
-      resource_type: 'video', // Cloudinary uses 'video' for audio too
-      public_id: publicId,
-      overwrite: true,
-    })
-  );
-
-  return result.secure_url;
+  if (LOCAL_MODE) return localPath;
+  const fileName = `${storyId}_part${partNumber}_thumbnail.jpg`;
+  return uploadToDrive(localPath, fileName, 'image/jpeg');
 }
 
-export async function uploadSubtitles(
-  localPath: string,
-  storyId: string,
-  partNumber: number
-): Promise<string> {
-  const publicId = `stories/${storyId}/part_${partNumber}/subtitles`;
-
-  const result = await retryWithBackoff(() =>
-    cloudinary.uploader.upload(localPath, {
-      resource_type: 'raw',
-      public_id: publicId,
-      overwrite: true,
-    })
-  );
-
-  return result.secure_url;
+export async function deleteVideoFiles(storyId: string, partNumber: number): Promise<void> {
+  // no-op in local mode
 }
 
-export async function deleteFromCloudinary(url: string): Promise<void> {
+// Download a Google Drive file to a local path (used in post.ts on GitHub Actions)
+export async function downloadFromDrive(driveUrl: string, destPath: string): Promise<void> {
+  const match = driveUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (!match) throw new Error(`Invalid Google Drive URL: ${driveUrl}`);
+  const fileId = match[1];
+
+  const drive = getDriveClient();
+  const res = await drive.files.get(
+    { fileId, alt: 'media' },
+    { responseType: 'stream' }
+  ) as any;
+
+  await new Promise<void>((resolve, reject) => {
+    const dest = fs.createWriteStream(destPath);
+    res.data.pipe(dest);
+    dest.on('finish', resolve);
+    dest.on('error', reject);
+  });
+}
+
+export async function deleteFromDrive(driveUrl: string): Promise<void> {
   try {
-    // Extract public_id from URL
-    const match = url.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[^.]+)?$/);
+    const match = driveUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (!match) return;
-    const publicId = match[1];
-    await cloudinary.uploader.destroy(publicId, { resource_type: 'video' });
+    const fileId = match[1];
+    const drive = getDriveClient();
+    await drive.files.delete({ fileId });
+    console.log(`  Deleted from Google Drive: ${fileId}`);
   } catch (err) {
-    console.warn(`  Warning: Could not delete from Cloudinary: ${url}`);
+    console.warn(`  Could not delete from Drive: ${(err as Error).message}`);
   }
-}
-
-export async function uploadAllPartAssets(
-  storyId: string,
-  partNumber: number,
-  paths: {
-    mainVideo?: string;
-    short?: string;
-    thumbnail?: string;
-    audio?: string;
-    shortAudio?: string;
-    subtitles?: string;
-  }
-): Promise<{
-  mainVideoUrl?: string;
-  shortUrl?: string;
-  thumbnailUrl?: string;
-  audioUrl?: string;
-  shortAudioUrl?: string;
-  subtitleUrl?: string;
-}> {
-  const urls: any = {};
-
-  if (paths.mainVideo)
-    urls.mainVideoUrl = await uploadVideo(paths.mainVideo, storyId, partNumber, 'main_video');
-  if (paths.short) urls.shortUrl = await uploadVideo(paths.short, storyId, partNumber, 'short');
-  if (paths.thumbnail)
-    urls.thumbnailUrl = await uploadThumbnail(paths.thumbnail, storyId, partNumber);
-  if (paths.audio) urls.audioUrl = await uploadAudio(paths.audio, storyId, partNumber, 'narration');
-  if (paths.shortAudio)
-    urls.shortAudioUrl = await uploadAudio(
-      paths.shortAudio,
-      storyId,
-      partNumber,
-      'short_narration'
-    );
-  if (paths.subtitles)
-    urls.subtitleUrl = await uploadSubtitles(paths.subtitles, storyId, partNumber);
-
-  return urls;
 }
 
 export function cleanupTempFiles(storyId: string): void {
