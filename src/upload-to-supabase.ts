@@ -14,11 +14,22 @@ import { createClient } from '@supabase/supabase-js';
 import { uploadVideo, uploadThumbnail } from './storage';
 import type { StoryRecord } from './database';
 
-const DB_PATH = path.join(process.cwd(), 'temp', 'db.json');
+const STORIES_DIR = path.join(process.cwd(), 'temp', 'stories');
 
-function readLocalDB(): { stories: StoryRecord[] } {
-  if (!fs.existsSync(DB_PATH)) throw new Error(`Local db not found: ${DB_PATH}`);
-  return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
+function getLatestStoryId(): string {
+  if (!fs.existsSync(STORIES_DIR)) throw new Error(`No stories dir found: ${STORIES_DIR}`);
+  const files = fs.readdirSync(STORIES_DIR)
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => ({ id: f.replace('.json', ''), mtime: fs.statSync(path.join(STORIES_DIR, f)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime);
+  if (files.length === 0) throw new Error('No story files found in temp/stories/');
+  return files[0].id;
+}
+
+function readStoryParts(storyId: string): StoryRecord[] {
+  const p = path.join(STORIES_DIR, `${storyId}.json`);
+  if (!fs.existsSync(p)) throw new Error(`Story file not found: ${p}`);
+  return JSON.parse(fs.readFileSync(p, 'utf-8')) as StoryRecord[];
 }
 
 function supabase() {
@@ -34,25 +45,36 @@ async function uploadPart(record: StoryRecord): Promise<void> {
     main: path.join(partDir, 'main_video.mp4'),
     facebook: path.join(partDir, 'main_video_facebook.mp4'),
     thumbnail: path.join(partDir, 'thumbnail.jpg'),
+    khmer: path.join(partDir, 'main_video_facebook_khmer.mp4'),
   };
 
-  // Check files exist
+  // Check required files exist
   for (const [name, p] of Object.entries(videoPaths)) {
+    if (name === 'khmer') continue; // optional
     if (!fs.existsSync(p)) throw new Error(`Missing ${name} file: ${p}`);
   }
 
+  const hasKhmer = fs.existsSync(videoPaths.khmer);
+
   console.log(`\n--- Part ${partNum}/4: "${record.title}" ---`);
+  if (hasKhmer) console.log(`  Khmer video found — will upload`);
 
   // Upload to Google Drive
-  const [videoUrl, fbVideoUrl, thumbnailUrl] = await Promise.all([
+  const uploadTasks: Promise<string>[] = [
     uploadVideo(videoPaths.main, storyId, partNum, 'main_video'),
     uploadVideo(videoPaths.facebook, storyId, partNum, 'facebook_video'),
     uploadThumbnail(videoPaths.thumbnail, storyId, partNum),
-  ]);
+  ];
+  if (hasKhmer) {
+    uploadTasks.push(uploadVideo(videoPaths.khmer, storyId, partNum, 'khmer_facebook_video'));
+  }
+
+  const [videoUrl, fbVideoUrl, thumbnailUrl, khmerFbVideoUrl] = await Promise.all(uploadTasks);
 
   console.log(`  YouTube video: ${videoUrl}`);
   console.log(`  Facebook video: ${fbVideoUrl}`);
   console.log(`  Thumbnail: ${thumbnailUrl}`);
+  if (khmerFbVideoUrl) console.log(`  Khmer Facebook video: ${khmerFbVideoUrl}`);
 
   // Upsert into Supabase DB
   const { error } = await supabase().from('stories').upsert({
@@ -79,9 +101,11 @@ async function uploadPart(record: StoryRecord): Promise<void> {
     video_url: videoUrl,
     facebook_video_url: fbVideoUrl,
     thumbnail_url: thumbnailUrl,
+    ...(khmerFbVideoUrl ? { khmer_facebook_video_url: khmerFbVideoUrl } : {}),
     video_path: videoPaths.main,
     facebook_video_path: videoPaths.facebook,
     thumbnail_path: videoPaths.thumbnail,
+    ...(hasKhmer ? { khmer_facebook_video_path: videoPaths.khmer } : {}),
     dramatic_image_url: record.dramatic_image_url,
   }, { onConflict: 'story_id,part' });
 
@@ -94,17 +118,20 @@ async function main() {
     ? parseInt(process.argv[process.argv.indexOf('--part') + 1])
     : undefined;
 
-  const db = readLocalDB();
-  const latest = db.stories[db.stories.length - 1];
-  if (!latest) throw new Error('No stories in local db');
+  const storyIdArg = process.argv.includes('--story')
+    ? process.argv[process.argv.indexOf('--story') + 1]
+    : undefined;
 
-  const storyId = latest.story_id;
+  const storyId = storyIdArg || getLatestStoryId();
+  const records = readStoryParts(storyId);
+  if (records.length === 0) throw new Error(`No parts found for story: ${storyId}`);
+
   console.log(`\nUploading story: ${storyId}`);
 
   const parts = partArg ? [partArg] : [1, 2, 3, 4];
 
   for (const partNum of parts) {
-    const record = db.stories.find((s) => s.story_id === storyId && s.part === partNum);
+    const record = records.find((s) => s.part === partNum);
     if (!record) {
       console.log(`  Part ${partNum}: not in local db, skipping`);
       continue;
@@ -115,7 +142,7 @@ async function main() {
   console.log('\nUpload complete. GitHub Actions will post on the scheduled post_date.');
   console.log('Post dates:');
   for (const partNum of parts) {
-    const r = db.stories.find((s) => s.story_id === storyId && s.part === partNum);
+    const r = records.find((s) => s.part === partNum);
     if (r) console.log(`  Part ${partNum}: ${r.post_date}`);
   }
 }

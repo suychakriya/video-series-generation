@@ -9,14 +9,16 @@ Automated daily story video generator. Generates 4-part story series with AI nar
 ```
 YOUR LOCAL MACHINE
 ─────────────────────────────────────────────────────
-1. npm run story      → Claude API → 4-part story → temp/db.json
-2. npm run generate   → images + audio + render → temp/{story_id}/
-3. npm run upload     → Google Drive (video files) + Supabase (metadata)
+1. npm run story      → Claude API → 4-part story → Supabase DB
+2. npm run images     → Kaggle (HuggingFace) → temp/{story_id}/images/
+3. npm run audio      → Google Colab (F5-TTS + edge-tts) → temp/{story_id}/audio/
+4. npm run render     → Remotion → temp/{story_id}/*.mp4
+5. npm run upload     → Google Drive (videos) + Supabase DB (URLs)
 
-GITHUB ACTIONS (daily cron at 9am UTC)
+GITHUB ACTIONS (daily cron at 9am UTC = 4pm Cambodia)
 ─────────────────────────────────────────────────────
-Read metadata from Supabase → download video from Google Drive
-→ post to Facebook + YouTube → delete from Google Drive
+Read metadata from Supabase → download videos from Google Drive
+→ post to Facebook (English + Khmer) + YouTube → delete from Google Drive
 ```
 
 ---
@@ -29,16 +31,19 @@ auto-story-video/
 │   ├── index.ts                — Entry point / command router
 │   ├── commands/
 │   │   ├── story.ts            — Generate story via Claude API
+│   │   ├── translate.ts        — Translate story to Khmer
 │   │   ├── images.ts           — Generate images
-│   │   ├── audio.ts            — Generate audio
-│   │   ├── render.ts           — Render video via Remotion
-│   │   ├── generate.ts         — Run images + audio + render
+│   │   ├── audio.ts            — Generate English + Khmer audio
+│   │   ├── render.ts           — Render videos via Remotion
+│   │   ├── generate.ts         — Run translate + images + audio + render
+│   │   ├── sync.ts             — (unused) VPS sync
 │   │   └── post.ts             — Post to Facebook + YouTube
 │   ├── story.ts                — Claude story generation logic
 │   ├── themes.ts               — 5 theme definitions
-│   ├── images.ts               — Image generation (local model / HuggingFace / Pexels)
-│   ├── audio.ts                — Audio generation (ElevenLabs / Edge TTS / macOS say)
-│   ├── animate.ts              — Image animator (Stable Video Diffusion)
+│   ├── images.ts               — Image generation (HuggingFace API)
+│   ├── audio.ts                — Audio generation (F5-TTS / ElevenLabs)
+│   ├── f5-tts.ts               — F5-TTS client (Google Colab server)
+│   ├── khmer-tts.ts            — Khmer TTS client (edge-tts via Colab server)
 │   ├── video/
 │   │   ├── render.ts           — Remotion rendering orchestrator
 │   │   ├── Root.tsx            — Remotion root
@@ -47,16 +52,17 @@ auto-story-video/
 │   │   ├── Thumbnail.tsx       — 1280×720 thumbnail
 │   │   └── style.css           — Video styles
 │   ├── database.ts             — Supabase CRUD (routes to local-database.ts when LOCAL_MODE=true)
-│   ├── local-database.ts       — Local JSON database (temp/db.json)
+│   ├── local-database.ts       — Local JSON database (temp/stories/)
 │   ├── storage.ts              — Google Drive upload/download/delete
 │   ├── facebook.ts             — Facebook Graph API video posting
 │   ├── youtube.ts              — YouTube Data API v3 video posting
-│   ├── seed-local-db.ts        — Seed local db from test-output/last-story.json
 │   ├── upload-to-supabase.ts   — Upload videos to Drive + sync to Supabase DB
 │   └── auth-google.ts          — Re-authenticate Google OAuth (YouTube + Drive scopes)
+├── colab_tts_server.ipynb      — Combined TTS server (F5-TTS + Khmer) on Google Colab
+├── colab_server.ipynb          — Image/animation server (FLUX + SVD) on Google Colab
 ├── .github/workflows/
 │   ├── post.yml                — Daily post cron (9am UTC)
-│   └── generate.yml            — Optional: auto-generate on schedule
+│   └── generate.yml            — Manual story generation
 ├── .env.example
 ├── tsconfig.json
 ├── package.json
@@ -68,7 +74,7 @@ auto-story-video/
 ## Prerequisites
 
 - Node.js 18+
-- ffmpeg (for audio concatenation)
+- ffmpeg (`brew install ffmpeg`)
 - All API keys in `.env`
 
 ---
@@ -85,13 +91,17 @@ cp .env.example .env
 # 3. Authenticate Google (YouTube + Drive) — run once
 npx ts-node src/auth-google.ts
 
-# 4. Generate story (saves to temp/db.json with LOCAL_MODE=true)
+# 4. Generate story (saves to Supabase DB)
 npm run story
 
-# 5. Generate videos (images + audio + render)
-npm run generate
+# 5. Start Colab TTS server (see section below), set ngrok URL in .env
 
-# 6. Upload to Google Drive + sync to Supabase
+# 6. Generate images, audio, render
+npm run images
+npm run audio
+npm run render
+
+# 7. Upload to Google Drive + sync to Supabase
 npm run upload
 
 # GitHub Actions posts automatically at 9am UTC each day
@@ -101,36 +111,41 @@ npm run upload
 
 ## Commands
 
+All commands accept `--story <story_id>` and `--part 1|2|3|4` flags.
+
 ### Story & Generation
 
 ```bash
-npm run story                     # Generate new 4-part story
+npm run story                                    # Generate new 4-part story via Claude
 
-npm run generate                  # Generate all 4 parts (images + audio + render)
-npm run generate -- --part 1      # Generate specific part only
-npm run generate -- --part 3
-```
+npm run translate                                # Translate story to Khmer
+npm run translate -- --part 1
 
-### Individual Steps
-
-```bash
-npm run images                    # Generate images (all parts)
+npm run images                                   # Generate scene images (all parts)
 npm run images -- --part 2
+npm run images -- --story story_20260416_342
 
-npm run audio                     # Generate audio (all parts)
+npm run audio                                    # Generate English + Khmer audio (all parts)
 npm run audio -- --part 2
+npm run audio -- --story story_20260416_342
 
-npm run render                    # Render videos (all parts)
+npm run render                                   # Render videos with Remotion (all parts)
 npm run render -- --part 2
+npm run render -- --story story_20260416_342
+
+npm run generate                                 # Run translate + images + audio + render
+npm run generate -- --part 1
+npm run generate -- --story story_20260416_342
 ```
 
 ### Upload & Post
 
 ```bash
-npm run upload                    # Upload all parts to Google Drive + Supabase
-npm run upload -- --part 3        # Upload specific part only
+npm run upload                                   # Upload all parts to Google Drive + Supabase
+npm run upload -- --part 3
+npm run upload -- --story story_20260416_342
 
-npm run post                      # Post today's story manually (normally done by GitHub Actions)
+npm run post                                     # Post today's story (normally GitHub Actions)
 npm run post -- --facebook-only
 npm run post -- --youtube-only
 ```
@@ -138,22 +153,39 @@ npm run post -- --youtube-only
 ### Utilities
 
 ```bash
-npm run seed-local                # Seed temp/db.json from test-output/last-story.json
-npx ts-node src/auth-google.ts    # Re-authenticate Google OAuth
+npx ts-node src/auth-google.ts                  # Re-authenticate Google OAuth
 ```
+
+---
+
+## Google Colab — TTS Server (`colab_tts_server.ipynb`)
+
+Run every session **before** `npm run audio`:
+
+1. Runtime → Change runtime type → **T4 GPU**
+2. **Cell 1** — install dependencies
+3. **Cell 2** — load F5-TTS model (~2 min first run, cached after)
+4. **Cell 3** — upload reference audio + pre-transcribe (~10 sec)
+5. **Cell 4** — start combined Flask server
+6. **Cell 5** — expose with ngrok, copy URL to `.env`
+7. **Cell 6** — keep-alive (leave running while generating audio)
+
+Routes served on a single ngrok URL:
+- `POST /tts` — Khmer TTS (edge-tts, `km-KH-PisethNeural`)
+- `POST /f5tts` — English voice cloning (F5-TTS)
 
 ---
 
 ## LOCAL_MODE
 
-Set `LOCAL_MODE=true` in `.env` to run entirely without Supabase:
+Set `LOCAL_MODE=true` in `.env` to store story data locally instead of Supabase:
 
 | `LOCAL_MODE` | Database | Storage upload |
 |---|---|---|
 | `false` | Supabase | Google Drive |
-| `true` | `temp/db.json` | Skipped (files stay local) |
+| `true` | `temp/stories/{story_id}.json` | Skipped (files stay local) |
 
-Typical workflow: generate locally with `LOCAL_MODE=true`, then `npm run upload` (which always uses real Supabase + Drive regardless of LOCAL_MODE).
+`npm run upload` always uses real Supabase + Drive regardless of `LOCAL_MODE`.
 
 ---
 
@@ -162,10 +194,11 @@ Typical workflow: generate locally with `LOCAL_MODE=true`, then `npm run upload`
 | Command | Requires |
 |---------|----------|
 | `story` | nothing |
+| `translate` | story in db |
 | `images` | story in db |
-| `audio` | story in db |
-| `render` | images done + audio done |
-| `upload` | rendered videos in temp/ |
+| `audio` | story in db + Colab TTS server running |
+| `render` | `images_status=done` + `audio_status=done` |
+| `upload` | rendered videos in `temp/` |
 | `post` | video URLs in Supabase DB |
 
 ---
@@ -181,9 +214,46 @@ Each story part tracks progress in Supabase:
 | `video_status` | `pending` \| `done` |
 | `video_url` | Google Drive URL (YouTube video) |
 | `facebook_video_url` | Google Drive URL (Facebook video) |
+| `khmer_facebook_video_url` | Google Drive URL (Khmer Facebook video) |
 | `thumbnail_url` | Google Drive URL |
 | `posted` | `false` \| `true` |
-| `post_date` | date to post (set automatically) |
+| `post_date` | date to post (set automatically, starting tomorrow) |
+
+---
+
+## Local File Structure
+
+```
+temp/
+  stories/
+    {story_id}.json              — story parts (all 4) with metadata
+  db.json                        — theme index + YouTube playlists
+  {story_id}/
+    part_{n}/
+      images/
+        scene_1_1.jpg
+        hook_image.jpg
+      scene_audios/
+        intro.mp3
+        scene_1.mp3
+        ...
+        hook.mp3
+        outro.mp3
+      khmer_audios/
+        intro.mp3
+        scene_1.mp3
+        ...
+        hook.mp3
+        outro.mp3
+      narration.mp3
+      narration_khmer.mp3
+      timings.json
+      timings_khmer.json
+      main_video.mp4
+      main_video_facebook.mp4
+      main_video_facebook_khmer.mp4
+      thumbnail.jpg
+```
 
 ---
 
@@ -193,12 +263,16 @@ Each story part tracks progress in Supabase:
 # Anthropic Claude API
 ANTHROPIC_API_KEY=
 
-# Image Generation
-PEXELS_API_KEY=
+# Image generation
 HUGGINGFACE_API_TOKEN=
-LOCAL_MODEL_URL=        # ngrok URL from Kaggle/Colab (optional)
+LOCAL_MODEL_URL=              # ngrok URL from Kaggle image server (optional)
 
-# Audio Generation
+# TTS — set TTS_PROVIDER=f5tts to use Colab, otherwise falls back to ElevenLabs
+TTS_PROVIDER=f5tts
+F5TTS_NGROK_URL=              # ngrok URL from colab_tts_server.ipynb
+KHMER_TTS_NGROK_URL=          # same URL as F5TTS_NGROK_URL
+
+# ElevenLabs (fallback if TTS_PROVIDER is not f5tts)
 ELEVENLABS_API_KEY=
 ELEVENLABS_VOICE_ID=
 
@@ -210,16 +284,16 @@ SUPABASE_ANON_KEY=
 FACEBOOK_PAGE_ID=
 FACEBOOK_PAGE_ACCESS_TOKEN=
 
-# YouTube + Google Drive (shared credentials)
+# YouTube + Google Drive (shared OAuth credentials)
 YOUTUBE_CLIENT_ID=
 YOUTUBE_CLIENT_SECRET=
 YOUTUBE_REFRESH_TOKEN=
 YOUTUBE_CHANNEL_ID=
-GOOGLE_DRIVE_FOLDER_ID=    # optional
+GOOGLE_DRIVE_FOLDER_ID=
 
 # Control
+LOCAL_MODE=true
 TEST_MODE=false
-LOCAL_MODE=false
 ```
 
 ---
@@ -237,10 +311,11 @@ YOUTUBE_CLIENT_ID
 YOUTUBE_CLIENT_SECRET
 YOUTUBE_REFRESH_TOKEN
 YOUTUBE_CHANNEL_ID
+GOOGLE_DRIVE_FOLDER_ID
 TEST_MODE
 ```
 
-The `post.yml` workflow runs daily at 9am UTC. To trigger manually: **Actions → Daily Post → Run workflow**.
+The `post.yml` workflow runs daily at 9am UTC (4pm Cambodia). To trigger manually: **Actions → Daily Post Facebook + YouTube + Shorts → Run workflow**.
 
 ---
 
@@ -261,14 +336,13 @@ create table stories (
   character_description text not null,
   style_prompt text not null,
   scenes jsonb,
-  base_image_url text,
   image_seed integer not null,
+  dramatic_image_url text,
   audio_url text,
   video_url text,
   facebook_video_url text,
-  short_url text,
+  khmer_facebook_video_url text,
   thumbnail_url text,
-  dramatic_image_url text,
   facebook_caption text not null,
   youtube_title text not null,
   youtube_description text not null,
@@ -278,6 +352,11 @@ create table stories (
   youtube_video_id text,
   youtube_video_url text,
   youtube_playlist_id text,
+  khmer_title text,
+  khmer_hook text,
+  khmer_facebook_caption text,
+  khmer_facebook_post_id text,
+  khmer_facebook_post_url text,
   comment_posted boolean default false,
   posted boolean default false,
   post_date date,
@@ -286,6 +365,7 @@ create table stories (
   video_status text default 'pending',
   video_path text,
   facebook_video_path text,
+  khmer_facebook_video_path text,
   thumbnail_path text,
   created_at timestamptz default now(),
   unique (story_id, part)

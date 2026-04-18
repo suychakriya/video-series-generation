@@ -47,6 +47,14 @@ export interface StoryRecord {
   youtube_short_id?: string;
   youtube_short_url?: string;
   youtube_playlist_id?: string;
+  scenes?: any[];
+  khmer_title?: string;
+  khmer_hook?: string;
+  khmer_facebook_caption?: string;
+  khmer_facebook_video_url?: string;
+  khmer_facebook_video_path?: string;
+  khmer_facebook_post_id?: string;
+  khmer_facebook_post_url?: string;
   comment_posted?: boolean;
   posted?: boolean;
   post_date?: string;
@@ -107,6 +115,7 @@ export async function getDramaticImageUrl(id: string): Promise<string | null> {
 export async function getTodayStory(): Promise<StoryRecord | null> {
   if (LOCAL_MODE) return local.getTodayStoryLocal();
   const today = new Date().toISOString().split('T')[0];
+  console.log(`[getTodayStory] querying for post_date=${today}, posted=false`);
   const { data, error } = await supabase()
     .from('stories')
     .select('*')
@@ -114,7 +123,11 @@ export async function getTodayStory(): Promise<StoryRecord | null> {
     .eq('posted', false)
     .limit(1)
     .single();
-  if (error || !data) return null;
+  if (error || !data) {
+    console.log(`[getTodayStory] not found — error: ${error?.code} ${error?.message}`);
+    return null;
+  }
+  console.log(`[getTodayStory] found: ${data.story_id} part ${data.part}`);
   return data as StoryRecord;
 }
 
@@ -229,7 +242,7 @@ export async function getStoryPart(storyId: string, part: number): Promise<Story
 
 export async function updatePartStatus(
   id: string,
-  updates: Partial<Pick<StoryRecord, 'images_status' | 'audio_status' | 'video_status' | 'video_path' | 'facebook_video_path' | 'thumbnail_path'>>
+  updates: Partial<Pick<StoryRecord, 'images_status' | 'audio_status' | 'video_status' | 'video_path' | 'facebook_video_path' | 'thumbnail_path' | 'khmer_facebook_video_path'>>
 ): Promise<void> {
   if (LOCAL_MODE) return local.updatePartStatusLocal(id, updates);
   const { error } = await supabase().from('stories').update(updates).eq('id', id);

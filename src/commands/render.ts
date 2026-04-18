@@ -54,13 +54,19 @@ function loadTimingsForPart(storyId: string, partNum: number): AudioTimings {
   return JSON.parse(fs.readFileSync(timingsPath, 'utf-8')) as AudioTimings;
 }
 
-export async function runRender(partArg?: number): Promise<void> {
-  const latestStory = await getLatestStory();
-  if (!latestStory) {
-    throw new Error('No story found in Supabase. Run "node src/index.ts story" first.');
+export async function runRender(partArg?: number, storyArg?: string): Promise<void> {
+  let storyId: string;
+  if (storyArg) {
+    storyId = storyArg;
+    console.log(`\nUsing specified story: ${storyId}`);
+  } else {
+    const latestStory = await getLatestStory();
+    if (!latestStory) {
+      throw new Error('No story found in Supabase. Run "node src/index.ts story" first.');
+    }
+    storyId = latestStory.story_id;
   }
 
-  const storyId = latestStory.story_id;
   console.log(`\nRendering video for story: ${storyId}`);
 
   const parts = partArg ? [partArg] : [1, 2, 3, 4];
@@ -159,11 +165,52 @@ export async function runRender(partArg?: number): Promise<void> {
       'facebook'
     );
 
+    // Render Khmer Facebook video if Khmer audio exists
+    const khmerAudioPath = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'narration_khmer.mp3');
+    const khmerTimingsPath = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'timings_khmer.json');
+    let khmerFbVideoPath: string | null = null;
+
+    if (fs.existsSync(khmerAudioPath) && fs.existsSync(khmerTimingsPath)) {
+      console.log(`  Waiting 5s for Remotion port to release...`);
+      await new Promise((r) => setTimeout(r, 5000));
+      console.log(`  Rendering Khmer Facebook video 1080x1350...`);
+      try {
+        const khmerTimings = JSON.parse(fs.readFileSync(khmerTimingsPath, 'utf-8')) as AudioTimings;
+        const khmerStoryPart = {
+          ...storyPart,
+          hook: (record as any).khmer_hook || storyPart.hook,
+          scenes: storyPart.scenes.map((s: any) => ({
+            ...s,
+            narration: s.khmer_narration || s.narration,
+          })),
+        };
+        const khmerTitle = (record as any).khmer_title || record.title;
+        khmerFbVideoPath = await renderMainVideo(
+          khmerStoryPart,
+          images,
+          khmerAudioPath,
+          theme,
+          storyId,
+          khmerTitle,
+          thumbnailPath,
+          hookImagePath,
+          khmerTimings,
+          'facebook',
+          '_khmer'
+        );
+      } catch (err) {
+        console.warn(`  Khmer video render failed (non-fatal): ${(err as Error).message}`);
+      }
+    } else {
+      console.log(`  Skipping Khmer video (Khmer audio not found — run audio step with KHMER_TTS_NGROK_URL set)`);
+    }
+
     // Determine output paths
     const basePath = getBasePath();
     const videoDestPath = path.join(basePath, storyId, `part_${partNum}`, 'main_video.mp4');
     const fbVideoDestPath = path.join(basePath, storyId, `part_${partNum}`, 'main_video_facebook.mp4');
     const thumbDestPath = path.join(basePath, storyId, `part_${partNum}`, 'thumbnail.jpg');
+    const khmerFbVideoDestPath = path.join(basePath, storyId, `part_${partNum}`, 'main_video_facebook_khmer.mp4');
 
     // Copy to canonical locations if different
     fs.mkdirSync(path.dirname(videoDestPath), { recursive: true });
@@ -176,32 +223,46 @@ export async function runRender(partArg?: number): Promise<void> {
     if (thumbnailPath !== thumbDestPath) {
       fs.copyFileSync(thumbnailPath, thumbDestPath);
     }
+    if (khmerFbVideoPath && khmerFbVideoPath !== khmerFbVideoDestPath) {
+      fs.copyFileSync(khmerFbVideoPath, khmerFbVideoDestPath);
+    }
 
-    // Update Supabase with local paths first
+    // Update DB with local paths first
     await updatePartStatus(record.id, {
       video_status: 'done',
       video_path: videoDestPath,
       facebook_video_path: fbVideoDestPath,
       thumbnail_path: thumbDestPath,
+      ...(khmerFbVideoPath ? { khmer_facebook_video_path: khmerFbVideoDestPath } : {}),
     });
 
-    // Upload to Supabase Storage
-    console.log(`  Uploading to Supabase Storage...`);
+    // Upload to Google Drive
+    console.log(`  Uploading to Google Drive...`);
     try {
-      const [videoUrl, fbVideoUrl, thumbnailUrl] = await Promise.all([
+      const uploadTasks: Promise<string>[] = [
         uploadVideo(videoDestPath, storyId, partNum, 'main_video'),
         uploadVideo(fbVideoDestPath, storyId, partNum, 'facebook_video'),
         uploadThumbnail(thumbDestPath, storyId, partNum),
-      ]);
-      await updateStoryPart(record.id, { video_url: videoUrl, facebook_video_url: fbVideoUrl, thumbnail_url: thumbnailUrl });
-      console.log(`  Supabase Storage upload done ✅`);
+      ];
+      if (khmerFbVideoPath) {
+        uploadTasks.push(uploadVideo(khmerFbVideoDestPath, storyId, partNum, 'khmer_facebook_video'));
+      }
+      const [videoUrl, fbVideoUrl, thumbnailUrl, khmerFbVideoUrl] = await Promise.all(uploadTasks);
+      await updateStoryPart(record.id, {
+        video_url: videoUrl,
+        facebook_video_url: fbVideoUrl,
+        thumbnail_url: thumbnailUrl,
+        ...(khmerFbVideoUrl ? { khmer_facebook_video_url: khmerFbVideoUrl } : {}),
+      });
+      console.log(`  Google Drive upload done ✅`);
     } catch (err) {
-      console.warn(`  Supabase Storage upload failed (non-fatal): ${(err as Error).message}`);
+      console.warn(`  Google Drive upload failed (non-fatal): ${(err as Error).message}`);
     }
 
     console.log(`  Part ${partNum} render done`);
     console.log(`    YouTube video: ${videoDestPath}`);
     console.log(`    Facebook video: ${fbVideoDestPath}`);
+    if (khmerFbVideoPath) console.log(`    Khmer Facebook video: ${khmerFbVideoDestPath}`);
     console.log(`    Thumbnail: ${thumbDestPath}`);
   }
 

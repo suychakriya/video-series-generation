@@ -7,6 +7,7 @@
     "seed-local": "ts-node src/seed-local-db.ts",
     "upload": "ts-node src/upload-to-supabase.ts",
     "story": "ts-node src/index.ts story",
+    "translate": "ts-node src/index.ts translate",
     "images": "ts-node src/index.ts images",
     "audio": "ts-node src/index.ts audio",
     "render": "ts-node src/index.ts render",

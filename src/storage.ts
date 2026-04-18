@@ -62,7 +62,7 @@ export async function uploadVideo(
   localPath: string,
   storyId: string,
   partNumber: number,
-  type: 'main_video' | 'facebook_video' | 'short'
+  type: 'main_video' | 'facebook_video' | 'khmer_facebook_video' | 'short'
 ): Promise<string> {
   if (LOCAL_MODE) {
     console.log(`  LOCAL_MODE: skipping upload for ${type}`);

@@ -44,13 +44,19 @@ async function scpFile(
   );
 }
 
-export async function runSync(partArg?: number): Promise<void> {
-  const latestStory = await getLatestStory();
-  if (!latestStory) {
-    throw new Error('No story found in Supabase.');
+export async function runSync(partArg?: number, storyArg?: string): Promise<void> {
+  let storyId: string;
+  if (storyArg) {
+    storyId = storyArg;
+    console.log(`\nUsing specified story: ${storyId}`);
+  } else {
+    const latestStory = await getLatestStory();
+    if (!latestStory) {
+      throw new Error('No story found in Supabase.');
+    }
+    storyId = latestStory.story_id;
   }
 
-  const storyId = latestStory.story_id;
   console.log(`\nSyncing files for story: ${storyId}`);
 
   const oracle = getOracleConfig();

@@ -54,9 +54,14 @@ export async function runStory(): Promise<void> {
       youtube_description: part.youtube_description_hook,
       youtube_tags: theme.youtubeTags,
       post_date: postDateStr,
+      posted: false,
       images_status: 'pending',
       audio_status: 'pending',
       video_status: 'pending',
+      scenes: part.scenes as any,
+      khmer_title: part.khmer_title,
+      khmer_hook: part.khmer_hook,
+      khmer_facebook_caption: part.khmer_facebook_caption,
     });
 
     console.log(`  Part ${part.part}/4 saved (id: ${recordId})`);

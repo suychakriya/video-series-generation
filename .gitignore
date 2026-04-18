@@ -3,6 +3,5 @@ temp/
 dist/
 .env
 *.config.json
-colab_server.ipynb
 .claude
 test-output/

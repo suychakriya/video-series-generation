@@ -54,11 +54,13 @@ export async function renderMainVideo(
   thumbnailPath: string,
   hookImagePath: string,
   timings: AudioTimings,
-  format: 'landscape' | 'facebook' = 'landscape'
+  format: 'landscape' | 'facebook' = 'landscape',
+  outputSuffix = ''
 ): Promise<string> {
   const outputDir = path.join(process.cwd(), 'temp', storyId, `part_${part.part}`);
   fs.mkdirSync(outputDir, { recursive: true });
-  const outputPath = path.join(outputDir, format === 'facebook' ? 'main_video_facebook.mp4' : 'main_video.mp4');
+  const baseName = format === 'facebook' ? 'main_video_facebook' : 'main_video';
+  const outputPath = path.join(outputDir, `${baseName}${outputSuffix}.mp4`);
 
   const fps = 30;
   const totalDurationSec =

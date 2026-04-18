@@ -4,14 +4,19 @@ dotenv.config();
 import { getLatestStory, getStoryPart, updateStoryPart, updatePartStatus } from '../database';
 import { fetchImagesForPart, generateHookImage } from '../images';
 
-export async function runImages(partArg?: number): Promise<void> {
-  const latestStory = await getLatestStory();
-  if (!latestStory) {
-    throw new Error('No story found in Supabase. Run "node src/index.ts story" first.');
+export async function runImages(partArg?: number, storyArg?: string): Promise<void> {
+  let storyId: string;
+  if (storyArg) {
+    storyId = storyArg;
+    console.log(`\nUsing specified story: ${storyId}`);
+  } else {
+    const latestStory = await getLatestStory();
+    if (!latestStory) {
+      throw new Error('No story found in Supabase. Run "node src/index.ts story" first.');
+    }
+    storyId = latestStory.story_id;
   }
-
-  const storyId = latestStory.story_id;
-  console.log(`\nGenerating images for story: ${storyId}`);
+  console.log(`Generating images for story: ${storyId}`);
 
   const parts = partArg ? [partArg] : [1, 2, 3, 4];
 

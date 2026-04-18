@@ -8,15 +8,23 @@ const PEXELS_API_KEY = process.env.PEXELS_API_KEY!;
 const HF_API_TOKEN = process.env.HUGGINGFACE_API_TOKEN!;
 const LOCAL_MODEL_URL = process.env.LOCAL_MODEL_URL; // Colab/RunPod server
 
-// Decide how much character description to include based on scene content.
-// Include character if the scene involves them acting/reacting (≈70% of scenes).
-// Exclude if the scene is purely about an object, place, or supernatural element.
-function characterWeightForScene(sceneDescription: string, characterDescription: string): string {
+// Returns the character description if the scene should show the character, empty string otherwise.
+// Uses the show_character flag set by Claude during story generation.
+// Falls back to a keyword heuristic for older stories that don't have the flag.
+function characterWeightForScene(
+  sceneDescription: string,
+  characterDescription: string,
+  showCharacter?: boolean
+): string {
+  // Use Claude's explicit flag if available
+  if (showCharacter === false) return '';
+  if (showCharacter === true) return characterDescription.slice(0, 120).trim();
+
+  // Legacy fallback: heuristic for stories generated before show_character was added
   const lower = sceneDescription.toLowerCase();
   const hasCharacterAction = /\b(he|his|him|man|boy|stands?|kneels?|raises?|holds?|stares?|faces?|rushes?|trembles?|reaches?|grabs?|turns?|looks?|walks?|runs?|falls?|rises?|sits?|lies?|watches?|gazes?|clutches?|steps?|leans?|crouches?|sprints?|freezes?|spins?|slams?|opens?|closes?|speaks?|shouts?|whispers?|cries?|smiles?|frowns?)\b/.test(lower);
-
-  if (!hasCharacterAction) return ''; // scene is about an object/place/phenomenon — no character
-  return characterDescription.split(',').slice(0, 3).join(',').trim(); // include character
+  if (!hasCharacterAction) return '';
+  return characterDescription.slice(0, 120).trim();
 }
 
 // HuggingFace Inference — FLUX.1-schnell (fast, good quality, free tier)
@@ -183,10 +191,14 @@ export async function generateHookImage(
 
   const atmosphere = stylePrompt.split(',').slice(0, 5).join(',').trim();
   const charPart = characterWeightForScene(hook, characterDescription);
+  const cleanHook = hook
+    .replace(/\b(like|as)\s+(a|an|the)\s+\w+(\s+\w+){0,3}/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
   const prompt = [
-    'donghua anime, cel shading, 2D illustration',
-    hook.slice(0, 250),
-    charPart,
+    'anime art style, cel shading, 2D illustration',
+    cleanHook.slice(0, 250),
+    charPart ? `consistent character: ${charPart}` : '',
     atmosphere,
     'cinematic composition, dramatic lighting, intense cliffhanger moment, masterpiece, highly detailed',
   ].filter(Boolean).join(', ');
@@ -208,7 +220,7 @@ export async function generateHookImage(
 
 export async function fetchImagesForPart(
   partNumber: number,
-  scenes: Array<{ scene_number: number; keywords: string[]; description: string }>,
+  scenes: Array<{ scene_number: number; keywords: string[]; description: string; show_character?: boolean }>,
   stylePrompt: string,
   characterDescription: string,
   imageSeed: number,
@@ -234,16 +246,20 @@ export async function fetchImagesForPart(
     let source: 'huggingface' | 'pexels' = 'huggingface';
 
     // Build prompt once per scene (shared across images)
-    const sceneAction = scene.description.slice(0, 250);
+    // Strip simile/metaphor phrases so the image generator doesn't take them literally
+    const sceneAction = scene.description
+      .replace(/\b(like|as)\s+(a|an|the)\s+\w+(\s+\w+){0,3}/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .slice(0, 250);
     const atmosphere = stylePrompt.split(',').slice(0, 5).join(',').trim();
     const actionKeywords = scene.keywords.slice(0, 5).join(', ');
-    // Include character only if scene involves character action (~70% of scenes)
-    const charPart = characterWeightForScene(scene.description, characterDescription);
+    const charPart = characterWeightForScene(scene.description, characterDescription, scene.show_character);
     const prompt = [
-      'donghua anime, cel shading, 2D illustration',
+      'anime art style, cel shading, 2D illustration',
       sceneAction,
       actionKeywords,
-      charPart,
+      charPart ? `consistent character: ${charPart}` : '',
       atmosphere,
       'cinematic composition, rule of thirds, dramatic lighting, masterpiece, highly detailed',
     ].filter(Boolean).join(', ');

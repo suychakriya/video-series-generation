@@ -23,7 +23,7 @@ export const THEMES: Theme[] = [
     id: 'horror_thriller',
     name: 'Horror & Thriller',
     stylePrompt:
-      'Chinese anime donghua art style, soft volumetric lighting, warm inner glow, traditional hanfu clothing, dark atmospheric background, delicate facial features, rich deep colors, dramatic shadows, high quality illustration, 8k, cinematic composition, blood, fog, ghostly spirits, moonlight',
+      'anime art style, soft volumetric lighting, warm inner glow, dark atmospheric background, expressive facial features, rich deep colors, dramatic shadows, high quality illustration, 8k, cinematic composition, blood, fog, ghostly spirits, moonlight',
     voiceTone: 'slow and suspenseful, whispering tone, dramatic pauses',
     facebookHashtags: '#horror #thriller #scarystory #horrorstory #scary #storytime #UntoldLores',
     youtubeTags:
@@ -49,7 +49,7 @@ export const THEMES: Theme[] = [
     id: 'drama_betrayal',
     name: 'Drama & Betrayal',
     stylePrompt:
-      'Chinese anime donghua art style, soft volumetric lighting, warm inner glow, traditional hanfu clothing, dark atmospheric background, delicate facial features, rich deep colors, dramatic shadows, high quality illustration, 8k, cinematic composition, tears, palace interior, candlelight',
+      'anime art style, soft volumetric lighting, warm inner glow, dark atmospheric background, expressive facial features, rich deep colors, dramatic shadows, high quality illustration, 8k, cinematic composition, tears, palace interior, candlelight',
     voiceTone: 'emotional and intense, dramatic pauses at shocking moments',
     facebookHashtags: '#drama #storytime #betrayal #relationship #shocking #mustread #UntoldLores',
     youtubeTags:
@@ -71,35 +71,10 @@ export const THEMES: Theme[] = [
     ],
   },
   {
-    id: 'true_crime_mystery',
-    name: 'True Crime Mystery',
-    stylePrompt:
-      'Chinese anime donghua art style, soft volumetric lighting, warm inner glow, traditional hanfu clothing, dark atmospheric background, delicate facial features, rich deep colors, dramatic shadows, high quality illustration, 8k, cinematic composition, dark streets, lanterns, rain, shadows',
-    voiceTone: 'serious and investigative, slow deliberate pacing, documentary style',
-    facebookHashtags: '#truecrime #mystery #crime #detective #unsolved #crimestory #UntoldLores',
-    youtubeTags:
-      'true crime, mystery, crime story, detective, unsolved mystery, animated mystery, untold lores, crime narration',
-    cliffhangerStyle: 'End each part with a new clue or twist that reframes everything',
-    thumbnailMood: 'mysterious, dark noir, shadowy figure, magnifying glass, cold blue tones',
-    shortHookStyle: 'documentary tone, pause before shocking final clue',
-    videoMood: 'mysterious, investigative, tense',
-    colorTint: 'rgba(42, 42, 42, 0.15)',
-    themeColor: '#00001a',
-    particleEffect: 'smoke',
-    leadIn: 'The final clue revealed...',
-    themeLabel: 'MYSTERY',
-    themeEmoji: '🔍',
-    exampleOpenings: [
-      'The detective had solved 200 cases. Case 201 was about his own disappearance.',
-      'Every year on the same date, someone left flowers on the grave. The dead man had no family.',
-      'The CCTV footage showed him walking into the building. It never showed him leaving.',
-    ],
-  },
-  {
     id: 'motivational_underdog',
     name: 'Motivational Underdog',
     stylePrompt:
-      'Chinese anime donghua art style, soft volumetric lighting, warm inner glow, traditional hanfu clothing, dark atmospheric background, delicate facial features, rich deep colors, dramatic shadows, high quality illustration, 8k, cinematic composition, golden sunrise, triumph, flowing robes',
+      'anime art style, soft volumetric lighting, warm inner glow, dark atmospheric background, expressive facial features, rich deep colors, dramatic shadows, high quality illustration, 8k, cinematic composition, golden sunrise, triumph, dynamic action pose',
     voiceTone: 'powerful and inspiring, building energy, emotional peaks',
     facebookHashtags:
       '#motivation #inspiration #success #nevergiveup #mindset #storytime #UntoldLores',
@@ -125,7 +100,7 @@ export const THEMES: Theme[] = [
     id: 'dark_fantasy',
     name: 'Dark Fantasy Adventure',
     stylePrompt:
-      'Chinese anime donghua art style, soft volumetric lighting, warm inner glow, traditional hanfu clothing, dark atmospheric background, delicate facial features, rich deep colors, dramatic shadows, high quality illustration, 8k, cinematic composition, magic particles, dragons, ancient temple, swords',
+      'anime art style, soft volumetric lighting, warm inner glow, dark atmospheric background, expressive facial features, rich deep colors, dramatic shadows, high quality illustration, 8k, cinematic composition, magic particles, dragons, ancient temple, swords',
     voiceTone: 'epic and theatrical, grand storytelling tone',
     facebookHashtags: '#fantasy #darkfantasy #adventure #magic #storytime #epicstory #UntoldLores',
     youtubeTags:

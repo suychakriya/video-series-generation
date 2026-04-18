@@ -6,8 +6,10 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 export interface Scene {
   scene_number: number;
   narration: string;  // the exact story text spoken while this scene's image is shown
+  khmer_narration?: string; // Khmer translation of the narration
   description: string;
   keywords: string[];
+  show_character: boolean; // true = character is the main subject; false = focus on environment/object
 }
 
 export interface StoryPart {
@@ -20,6 +22,9 @@ export interface StoryPart {
   facebook_caption: string;
   youtube_title: string;
   youtube_description_hook: string;
+  khmer_title?: string;         // Khmer translation of the story title
+  khmer_hook?: string;          // Khmer translation of the hook
+  khmer_facebook_caption?: string; // Khmer Facebook caption
 }
 
 export interface FullStory {
@@ -62,6 +67,10 @@ ${theme.exampleOpenings.map((e, i) => `${i + 1}. ${e}`).join('\n')}
 REQUIREMENTS:
 - The main protagonist MUST be male. All stories are narrated by a male voice,
   so the lead character should be a man or boy. Supporting characters can be any gender.
+- Character names and backgrounds must be VARIED across stories — do NOT default to Chinese names.
+  Draw from diverse cultures: Japanese, Korean, Southeast Asian, Middle Eastern, European, African,
+  Latin American, etc. Match the name to the story's setting and atmosphere, not the visual style.
+  The visual style (anime art) is for images only — it does not dictate the story's culture.
 - Each part: 800-1000 words
 - Each part has as many scenes as the story naturally requires (min 5, max 40).
   Each scene covers 1-3 sentences of the story. Break the story into scenes at every
@@ -73,9 +82,20 @@ REQUIREMENTS:
 - Each scene's description MUST capture the single most dramatic, visually striking moment
   of that scene — the peak action, emotional climax, or pivotal reveal. Be cinematic and specific:
   WHO is doing WHAT, their exact expression/posture/action, and what surrounds them.
-  Bad: "Chen Wei enters the temple". Good: "Chen Wei freezes in the temple doorway, lantern raised,
-  face pale with shock as a figure rises from the shadows ahead of him".
-  This description is sent directly to an AI image generator — make every word count.
+- For each scene, set show_character: true if the character's face/body is the main visual focus.
+  Set show_character: false when the scene is better shown as: an environment (empty room, forest,
+  city street), an object (a letter, a weapon, a door), a crowd shot, a wide establishing shot,
+  or any moment where the atmosphere/setting matters more than the character's appearance.
+  About 10-20% of scenes should have show_character: false for visual variety.
+- CRITICAL — descriptions are sent DIRECTLY to an image generator that takes every word LITERALLY:
+  - NO metaphors, similes, or figurative language. If the narration says "she moved like a wave",
+    the description must NOT say "wave" — say what the character is literally doing instead.
+  - NO abstract concepts ("grief", "hope", "fear") — describe the visible physical action only.
+  - ONLY describe what would literally appear in a photograph or painting.
+  Bad: "she dances like the waves of the sea" → image generator draws ocean waves.
+  Bad: "his anger burned like fire" → image generator draws fire.
+  Good: "she spins gracefully across the stone floor, arms outstretched, silk robes billowing".
+  Good: "he clenches his jaw, fists shaking at his sides, eyes locked on the figure ahead".
 - Each scene has vivid visual keywords focused on the key action, emotion, and atmosphere
   (not just the setting — include the character's state and the dramatic tension)
 - Cliffhanger hook at end of each part (1-2 sentences, ultra dramatic)
@@ -88,7 +108,7 @@ REQUIREMENTS:
 Respond with ONLY valid JSON in this exact format:
 {
   "overall_title": "string",
-  "character_description": "string (detailed physical description for image consistency)",
+  "character_description": "string (highly specific physical description for image consistency — MUST include: unique face feature like scar/unusual eyes/jaw shape, exact hair style and color, specific clothing with color, approximate age, skin tone, build. Example: 'young man mid-20s, lean build, olive skin, sharp angular jaw, short messy dark brown hair with a streak of grey, deep-set amber eyes, wearing a worn dark teal jacket over a grey tunic, small scar above left eyebrow')",
   "style_prompt": "string (specific visual style for this story)",
   "image_seed": number (random integer 1000-9999),
   "parts": [
@@ -102,8 +122,9 @@ Respond with ONLY valid JSON in this exact format:
         {
           "scene_number": 1,
           "narration": "string (the exact sentences from content spoken during this scene)",
-          "description": "string (cinematic peak moment for image generation)",
-          "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"]
+          "description": "string (cinematic peak moment for image generation — literal visuals only, no metaphors)",
+          "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
+          "show_character": true
         }
       ],
       "facebook_caption": "string",

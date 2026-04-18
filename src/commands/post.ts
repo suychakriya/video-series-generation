@@ -85,6 +85,21 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
     path.join(tempDir, 'thumbnail.jpg')
   );
 
+  // Khmer video — optional, skip if not available
+  let localKhmerFbVideoPath: string | null = null;
+  const hasKhmerVideo = !!(story.khmer_facebook_video_path || story.khmer_facebook_video_url);
+  if (hasKhmerVideo && !youtubeOnly) {
+    try {
+      localKhmerFbVideoPath = await resolveFile(
+        story.khmer_facebook_video_path,
+        story.khmer_facebook_video_url,
+        path.join(tempDir, 'main_video_facebook_khmer.mp4')
+      );
+    } catch (err) {
+      console.warn(`  Khmer video not found, skipping Khmer post: ${(err as Error).message}`);
+    }
+  }
+
   const label = facebookOnly ? ' [Facebook only]' : youtubeOnly ? ' [YouTube only]' : '';
   console.log(`Posting: "${story.title}" (Part ${story.part}/4)${label}`);
 
@@ -92,8 +107,9 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
 
   let fbStatus = youtubeOnly ? 'skipped' : 'pending';
   let ytStatus = facebookOnly ? 'skipped' : 'pending';
+  let khmerFbStatus = (youtubeOnly || !localKhmerFbVideoPath) ? 'skipped' : 'pending';
 
-  const [fbResult, ytResult] = await Promise.allSettled([
+  const [fbResult, ytResult, khmerFbResult] = await Promise.allSettled([
     // FACEBOOK TASK
     (async () => {
       if (youtubeOnly) return null;
@@ -207,6 +223,44 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
 
       return ytUploadResult;
     })(),
+
+    // KHMER FACEBOOK TASK
+    (async () => {
+      if (youtubeOnly || !localKhmerFbVideoPath) return null;
+
+      console.log('\nPosting Khmer video to Facebook...');
+      const khmerCaption = (story as any).khmer_facebook_caption || story.facebook_caption;
+      const result = await postVideoToFacebook(
+        localKhmerFbVideoPath,
+        khmerCaption,
+        story.title
+      );
+      await updateStoryPart(story.id!, {
+        khmer_facebook_post_id: result.postId,
+        khmer_facebook_post_url: result.postUrl,
+      });
+      khmerFbStatus = 'success';
+      console.log(`  Khmer Facebook posted: ${result.postUrl}`);
+
+      // Previous parts comment in Khmer
+      if (story.part > 1) {
+        await new Promise((r) => setTimeout(r, 30000));
+        const allParts = await getAllPartUrls(story.story_id);
+        const previousParts = allParts
+          .filter((p) => p.part < story.part && p.youtube_video_url)
+          .map((p) => ({
+            part: p.part,
+            url: p.youtube_video_url!,
+            title: `ផ្នែកទី ${p.part}`,
+          }));
+        if (previousParts.length > 0) {
+          console.log('  Posting previous parts comment on Khmer Facebook post...');
+          await postPreviousPartsComment(result.postId, previousParts);
+        }
+      }
+
+      return result;
+    })(),
   ]);
 
   const fbData = fbResult.status === 'fulfilled' ? fbResult.value : null;
@@ -216,6 +270,9 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
   const ytData = ytResult.status === 'fulfilled' ? ytResult.value as YouTubeUploadResult | null : null;
   if (ytResult.status === 'rejected') {
     console.error('  YouTube error:', (ytResult.reason as Error).message);
+  }
+  if (khmerFbResult.status === 'rejected') {
+    console.error('  Khmer Facebook error:', (khmerFbResult.reason as Error).message);
   }
 
   // Only mark as posted and delete video when running without flags (both platforms)
@@ -229,7 +286,11 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
     console.log('\nMarked as posted.');
 
     // Delete from Google Drive (free up space)
-    for (const url of [story.video_url, (story as any).facebook_video_url].filter(Boolean)) {
+    for (const url of [
+      story.video_url,
+      (story as any).facebook_video_url,
+      story.khmer_facebook_video_url,
+    ].filter(Boolean)) {
       await deleteFromDrive(url);
     }
 
@@ -248,8 +309,8 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
     facebook_status: fbStatus,
     youtube_status: ytStatus,
     error_message:
-      fbResult.status === 'rejected' || ytResult.status === 'rejected'
-        ? `FB: ${fbResult.status === 'rejected' ? (fbResult.reason as Error).message : 'ok'} | YT: ${ytResult.status === 'rejected' ? (ytResult.reason as Error).message : 'ok'}`
+      fbResult.status === 'rejected' || ytResult.status === 'rejected' || khmerFbResult.status === 'rejected'
+        ? `FB: ${fbResult.status === 'rejected' ? (fbResult.reason as Error).message : 'ok'} | YT: ${ytResult.status === 'rejected' ? (ytResult.reason as Error).message : 'ok'} | KH: ${khmerFbResult.status === 'rejected' ? (khmerFbResult.reason as Error).message : khmerFbStatus}`
         : undefined,
   });
 
