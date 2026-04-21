@@ -83,10 +83,10 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
       continue;
     }
 
-    // Download assets from Supabase Storage if not present locally
+    // Download assets from Supabase Storage (always on GitHub Actions, otherwise only if missing)
     const imageDir = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'images');
     const narrationPath = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'narration.mp3');
-    if (!fs.existsSync(imageDir) || !fs.existsSync(narrationPath)) {
+    if (ON_GITHUB_ACTIONS || !fs.existsSync(imageDir) || !fs.existsSync(narrationPath)) {
       await downloadStoryAssets(storyId, partNum);
     }
 
