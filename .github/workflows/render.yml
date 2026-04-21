@@ -20,7 +20,7 @@ jobs:
         run: npm ci
 
       - name: Install Chromium for Remotion
-        run: npx remotion browser ensure
+        run: ./node_modules/.bin/remotion browser ensure
 
       - name: Render videos
         run: npx ts-node src/index.ts render
@@ -28,6 +28,7 @@ jobs:
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
       YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
       YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
