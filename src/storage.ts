@@ -137,10 +137,10 @@ export function cleanupTempFiles(storyId: string): void {
 // ── Supabase Storage ──────────────────────────────────────────────────────────
 
 function getSupabaseClient() {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
-    throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required');
-  }
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+  return createClient(url, key);
 }
 
 async function downloadFolder(
@@ -149,7 +149,10 @@ async function downloadFolder(
   localDir: string
 ): Promise<void> {
   const { data: files, error } = await sb.storage.from(STORAGE_BUCKET).list(storagePrefix);
-  if (error || !files || files.length === 0) return;
+  if (error || !files || files.length === 0) {
+    fs.mkdirSync(localDir, { recursive: true });
+    return;
+  }
 
   fs.mkdirSync(localDir, { recursive: true });
 
