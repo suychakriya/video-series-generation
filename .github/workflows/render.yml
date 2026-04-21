@@ -19,9 +19,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Chromium for Remotion
-        run: ./node_modules/.bin/remotion browser ensure
-
       - name: Render videos
         run: npx ts-node src/index.ts render
 
