@@ -9,6 +9,7 @@
     "story": "ts-node src/index.ts story",
     "translate": "ts-node src/index.ts translate",
     "images": "ts-node src/index.ts images",
+    "animate": "ts-node src/index.ts animate",
     "audio": "ts-node src/index.ts audio",
     "render": "ts-node src/index.ts render",
     "generate": "ts-node src/index.ts generate",

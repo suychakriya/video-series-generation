@@ -23,10 +23,7 @@ function toAudioDataUri(filePath: string): string {
   return `data:audio/mpeg;base64,${data}`;
 }
 
-function toVideoDataUri(filePath: string): string {
-  const data = fs.readFileSync(filePath).toString('base64');
-  return `data:video/mp4;base64,${data}`;
-}
+
 
 // Bundle once and reuse across all renders in a pipeline run
 let cachedBundleUrl: string | null = null;
@@ -76,10 +73,7 @@ export async function renderMainVideo(
   // Build clips: thumbnail (intro), scene images, thumbnail again (hook)
   const clips: Array<{ src: string; isVideo: boolean }> = [];
   clips.push({ src: toDataUri(thumbnailPath), isVideo: false }); // index 0 — intro
-  imageResults.forEach((r) => clips.push({
-    src: r.isVideo ? toVideoDataUri(r.clipPath) : toDataUri(r.localPath),
-    isVideo: r.isVideo,
-  }));
+  imageResults.forEach((r) => clips.push({ src: toDataUri(r.localPath), isVideo: false }));
   clips.push({ src: toDataUri(hookImagePath), isVideo: false }); // last — hook
 
   // Scene metadata (1 image per scene)

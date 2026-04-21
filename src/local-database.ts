@@ -40,7 +40,7 @@ function storyPath(storyId: string): string {
   return path.join(STORIES_DIR, `${storyId}.json`);
 }
 
-function readStoryFile(storyId: string): StoryRecord[] {
+export function readStoryFile(storyId: string): StoryRecord[] {
   const p = storyPath(storyId);
   if (!fs.existsSync(p)) return [];
   try {
@@ -57,7 +57,7 @@ function writeStoryFile(storyId: string, parts: StoryRecord[]): void {
 }
 
 /** Returns all story IDs sorted by most recently modified. */
-function allStoryIds(): string[] {
+export function allStoryIds(): string[] {
   if (!fs.existsSync(STORIES_DIR)) return [];
   return fs
     .readdirSync(STORIES_DIR)

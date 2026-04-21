@@ -216,6 +216,32 @@ export async function getPlaylistId(storyId: string): Promise<string | null> {
   return data?.playlist_id || null;
 }
 
+export async function getLatestScheduledPostDate(): Promise<string | null> {
+  if (LOCAL_MODE) {
+    const { allStoryIds, readStoryFile } = require('./local-database') as any;
+    // read all local parts and find max post_date
+    let maxDate: string | null = null;
+    for (const storyId of allStoryIds()) {
+      const parts = readStoryFile(storyId);
+      for (const p of parts) {
+        if (p.post_date && (!maxDate || p.post_date > maxDate)) {
+          maxDate = p.post_date;
+        }
+      }
+    }
+    return maxDate;
+  }
+  const { data, error } = await supabase()
+    .from('stories')
+    .select('post_date')
+    .eq('posted', false)
+    .order('post_date', { ascending: false })
+    .limit(1)
+    .single();
+  if (error || !data) return null;
+  return data.post_date;
+}
+
 export async function getLatestStory(): Promise<StoryRecord | null> {
   if (LOCAL_MODE) return local.getLatestStoryLocal();
   const { data, error } = await supabase()

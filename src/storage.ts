@@ -1,8 +1,11 @@
 import { google } from 'googleapis';
+import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const LOCAL_MODE = process.env.LOCAL_MODE === 'true';
+export const STORAGE_BUCKET = 'story-assets';
+
+// ── Google Drive ──────────────────────────────────────────────────────────────
 
 function getDriveClient() {
   const auth = new google.auth.OAuth2(
@@ -12,6 +15,8 @@ function getDriveClient() {
   auth.setCredentials({ refresh_token: process.env.YOUTUBE_REFRESH_TOKEN });
   return google.drive({ version: 'v3', auth });
 }
+
+const LOCAL_MODE = process.env.LOCAL_MODE === 'true';
 
 async function retryWithBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   for (let i = 0; i < maxRetries; i++) {
@@ -127,4 +132,89 @@ export function cleanupTempFiles(storyId: string): void {
   } catch (err) {
     console.warn(`  Warning: Could not clean up temp dir: ${tempDir}`);
   }
+}
+
+// ── Supabase Storage ──────────────────────────────────────────────────────────
+
+function getSupabaseClient() {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+    throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required');
+  }
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+}
+
+async function downloadFolder(
+  sb: ReturnType<typeof getSupabaseClient>,
+  storagePrefix: string,
+  localDir: string
+): Promise<void> {
+  const { data: files, error } = await sb.storage.from(STORAGE_BUCKET).list(storagePrefix);
+  if (error || !files || files.length === 0) return;
+
+  fs.mkdirSync(localDir, { recursive: true });
+
+  for (const file of files) {
+    if (file.name === '.emptyFolderPlaceholder') continue;
+    const { data, error: dlError } = await sb.storage
+      .from(STORAGE_BUCKET)
+      .download(`${storagePrefix}/${file.name}`);
+    if (dlError || !data) throw new Error(`Download failed (${storagePrefix}/${file.name}): ${dlError?.message}`);
+    const buf = Buffer.from(await data.arrayBuffer());
+    fs.writeFileSync(path.join(localDir, file.name), buf);
+  }
+}
+
+export async function downloadStoryAssets(storyId: string, partNum: number): Promise<void> {
+  const sb = getSupabaseClient();
+  const storageBase = `${storyId}/part_${partNum}`;
+  const partDir = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`);
+
+  console.log(`  Downloading assets from Supabase Storage for part ${partNum}...`);
+
+  // Images
+  await downloadFolder(sb, `${storageBase}/images`, path.join(partDir, 'images'));
+
+  // English scene audios
+  await downloadFolder(sb, `${storageBase}/audio/scene_audios`, path.join(partDir, 'scene_audios'));
+
+  // Khmer scene audios (optional)
+  await downloadFolder(sb, `${storageBase}/audio/khmer_audios`, path.join(partDir, 'khmer_audios'));
+
+  // Narration + timings root files
+  fs.mkdirSync(partDir, { recursive: true });
+  const rootFiles = ['narration.mp3', 'narration_khmer.mp3', 'timings.json', 'timings_khmer.json'];
+  for (const file of rootFiles) {
+    const { data, error } = await sb.storage
+      .from(STORAGE_BUCKET)
+      .download(`${storageBase}/audio/${file}`);
+    if (error || !data) continue; // optional — khmer files may not exist
+    const buf = Buffer.from(await data.arrayBuffer());
+    fs.writeFileSync(path.join(partDir, file), buf);
+  }
+
+  console.log(`  Assets downloaded for part ${partNum} ✅`);
+}
+
+export async function deleteStoryFromStorage(storyId: string): Promise<void> {
+  const sb = getSupabaseClient();
+
+  const folders = [1, 2, 3, 4].flatMap((partNum) => [
+    `${storyId}/part_${partNum}/images`,
+    `${storyId}/part_${partNum}/audio/scene_audios`,
+    `${storyId}/part_${partNum}/audio/khmer_audios`,
+    `${storyId}/part_${partNum}/audio`,
+  ]);
+
+  for (const folder of folders) {
+    const { data: files } = await sb.storage.from(STORAGE_BUCKET).list(folder);
+    if (!files || files.length === 0) continue;
+    const filePaths = files
+      .filter((f) => f.name !== '.emptyFolderPlaceholder')
+      .map((f) => `${folder}/${f.name}`);
+    if (filePaths.length > 0) {
+      await sb.storage.from(STORAGE_BUCKET).remove(filePaths);
+    }
+  }
+
+  console.log(`  Deleted story assets from Supabase Storage: ${storyId}`);
 }

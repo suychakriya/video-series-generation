@@ -7,6 +7,7 @@ import {
   saveStoryPart,
   getCurrentThemeIndex,
   incrementThemeIndex,
+  getLatestScheduledPostDate,
 } from '../database';
 
 function generateStoryId(): string {
@@ -28,9 +29,18 @@ export async function runStory(): Promise<void> {
   const story = await generateFullStory(theme, storyId);
   console.log(`Story: "${story.overall_title}"`);
 
-  // Set post dates (one per day starting tomorrow)
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  // Set post dates — start after the latest scheduled post, or tomorrow if none
+  const latestPostDate = await getLatestScheduledPostDate();
+  const startDate = new Date();
+  if (latestPostDate) {
+    // Start the day after the last scheduled post
+    startDate.setTime(new Date(latestPostDate + 'T00:00:00').getTime());
+    startDate.setDate(startDate.getDate() + 1);
+  } else {
+    // No existing scheduled posts — start tomorrow
+    startDate.setDate(startDate.getDate() + 1);
+  }
+  const tomorrow = startDate;
 
   for (let i = 0; i < story.parts.length; i++) {
     const part = story.parts[i];

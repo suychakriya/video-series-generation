@@ -8,13 +8,9 @@ import { getThemeById } from '../themes';
 import { renderMainVideo, renderThumbnail } from '../video/render';
 import { AudioTimings } from '../audio';
 import { ImageResult } from '../images';
-import { uploadVideo, uploadThumbnail } from '../storage';
+import { uploadVideo, uploadThumbnail, downloadStoryAssets, deleteStoryFromStorage } from '../storage';
 
-function getBasePath(): string {
-  const env = process.env.ENV || 'local';
-  if (env === 'oracle') return '/opt/stories';
-  return path.join(process.cwd(), 'temp');
-}
+const ON_GITHUB_ACTIONS = process.env.GITHUB_ACTIONS === 'true';
 
 function loadImagesForPart(storyId: string, partNum: number): ImageResult[] {
   const imageDir = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'images');
@@ -31,15 +27,14 @@ function loadImagesForPart(storyId: string, partNum: number): ImageResult[] {
 
   return files.map((f, i) => {
     const localPath = path.join(imageDir, f);
-    const clipPath = localPath.replace(/\.jpg$/, '.mp4');
-    const isVideo = fs.existsSync(clipPath);
-    // sceneIndex derived from scene_N_M.jpg filename
-    const sceneIndex = parseInt(f.match(/scene_(\d+)/)![1]) - 1;
+    const sceneNum = parseInt(f.match(/scene_(\d+)/)![1]);
+    const imgNum = parseInt(f.match(/scene_\d+_(\d+)/)![1]);
+    const sceneIndex = sceneNum;
     return {
       url: localPath,
       localPath,
-      clipPath: isVideo ? clipPath : localPath,
-      isVideo,
+      clipPath: localPath,
+      isVideo: false,
       source: 'huggingface' as const,
       sceneIndex,
     };
@@ -68,17 +63,17 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
   }
 
   console.log(`\nRendering video for story: ${storyId}`);
+  if (ON_GITHUB_ACTIONS) console.log('  Running on GitHub Actions — assets will be downloaded from Supabase Storage');
 
   const parts = partArg ? [partArg] : [1, 2, 3, 4];
 
   for (const partNum of parts) {
     const record = await getStoryPart(storyId, partNum);
     if (!record || !record.id) {
-      console.log(`  Part ${partNum}: not found in Supabase, skipping`);
+      console.log(`  Part ${partNum}: not found in DB, skipping`);
       continue;
     }
 
-    // Check conditions
     if (record.images_status !== 'done') {
       console.log(`  Part ${partNum}: images_status is not 'done' (${record.images_status}), skipping`);
       continue;
@@ -86,6 +81,13 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
     if (record.audio_status !== 'done') {
       console.log(`  Part ${partNum}: audio_status is not 'done' (${record.audio_status}), skipping`);
       continue;
+    }
+
+    // Download assets from Supabase Storage if not present locally
+    const imageDir = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'images');
+    const narrationPath = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'narration.mp3');
+    if (!fs.existsSync(imageDir) || !fs.existsSync(narrationPath)) {
+      await downloadStoryAssets(storyId, partNum);
     }
 
     console.log(`\n--- Part ${partNum}/4 ---`);
@@ -138,31 +140,15 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
     // Render main video (YouTube 1920x1080)
     console.log(`  Rendering main video 1920x1080 (YouTube)...`);
     const mainVideoPath = await renderMainVideo(
-      storyPart,
-      images,
-      audioPath,
-      theme,
-      storyId,
-      record.title,
-      thumbnailPath,
-      hookImagePath,
-      timings,
-      'landscape'
+      storyPart, images, audioPath, theme, storyId, record.title,
+      thumbnailPath, hookImagePath, timings, 'landscape'
     );
 
     // Render Facebook video (1080x1350)
     console.log(`  Rendering Facebook video 1080x1350...`);
     const fbVideoPath = await renderMainVideo(
-      storyPart,
-      images,
-      audioPath,
-      theme,
-      storyId,
-      record.title,
-      thumbnailPath,
-      hookImagePath,
-      timings,
-      'facebook'
+      storyPart, images, audioPath, theme, storyId, record.title,
+      thumbnailPath, hookImagePath, timings, 'facebook'
     );
 
     // Render Khmer Facebook video if Khmer audio exists
@@ -186,48 +172,32 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
         };
         const khmerTitle = (record as any).khmer_title || record.title;
         khmerFbVideoPath = await renderMainVideo(
-          khmerStoryPart,
-          images,
-          khmerAudioPath,
-          theme,
-          storyId,
-          khmerTitle,
-          thumbnailPath,
-          hookImagePath,
-          khmerTimings,
-          'facebook',
-          '_khmer'
+          khmerStoryPart, images, khmerAudioPath, theme, storyId, khmerTitle,
+          thumbnailPath, hookImagePath, khmerTimings, 'facebook', '_khmer'
         );
       } catch (err) {
         console.warn(`  Khmer video render failed (non-fatal): ${(err as Error).message}`);
       }
     } else {
-      console.log(`  Skipping Khmer video (Khmer audio not found — run audio step with KHMER_TTS_NGROK_URL set)`);
+      console.log(`  Skipping Khmer video (Khmer audio not found)`);
     }
 
-    // Determine output paths
-    const basePath = getBasePath();
-    const videoDestPath = path.join(basePath, storyId, `part_${partNum}`, 'main_video.mp4');
-    const fbVideoDestPath = path.join(basePath, storyId, `part_${partNum}`, 'main_video_facebook.mp4');
-    const thumbDestPath = path.join(basePath, storyId, `part_${partNum}`, 'thumbnail.jpg');
-    const khmerFbVideoDestPath = path.join(basePath, storyId, `part_${partNum}`, 'main_video_facebook_khmer.mp4');
+    // Canonical output paths
+    const partDir = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`);
+    const videoDestPath = path.join(partDir, 'main_video.mp4');
+    const fbVideoDestPath = path.join(partDir, 'main_video_facebook.mp4');
+    const thumbDestPath = path.join(partDir, 'thumbnail.jpg');
+    const khmerFbVideoDestPath = path.join(partDir, 'main_video_facebook_khmer.mp4');
 
-    // Copy to canonical locations if different
-    fs.mkdirSync(path.dirname(videoDestPath), { recursive: true });
-    if (mainVideoPath !== videoDestPath) {
-      fs.copyFileSync(mainVideoPath, videoDestPath);
-    }
-    if (fbVideoPath !== fbVideoDestPath) {
-      fs.copyFileSync(fbVideoPath, fbVideoDestPath);
-    }
-    if (thumbnailPath !== thumbDestPath) {
-      fs.copyFileSync(thumbnailPath, thumbDestPath);
-    }
+    fs.mkdirSync(partDir, { recursive: true });
+    if (mainVideoPath !== videoDestPath) fs.copyFileSync(mainVideoPath, videoDestPath);
+    if (fbVideoPath !== fbVideoDestPath) fs.copyFileSync(fbVideoPath, fbVideoDestPath);
+    if (thumbnailPath !== thumbDestPath) fs.copyFileSync(thumbnailPath, thumbDestPath);
     if (khmerFbVideoPath && khmerFbVideoPath !== khmerFbVideoDestPath) {
       fs.copyFileSync(khmerFbVideoPath, khmerFbVideoDestPath);
     }
 
-    // Update DB with local paths first
+    // Update DB with paths
     await updatePartStatus(record.id, {
       video_status: 'done',
       video_path: videoDestPath,
@@ -260,10 +230,16 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
     }
 
     console.log(`  Part ${partNum} render done`);
-    console.log(`    YouTube video: ${videoDestPath}`);
-    console.log(`    Facebook video: ${fbVideoDestPath}`);
-    if (khmerFbVideoPath) console.log(`    Khmer Facebook video: ${khmerFbVideoDestPath}`);
-    console.log(`    Thumbnail: ${thumbDestPath}`);
+  }
+
+  // Clean up Supabase Storage after all parts rendered (GitHub Actions only)
+  if (ON_GITHUB_ACTIONS) {
+    console.log('\nCleaning up Supabase Storage...');
+    try {
+      await deleteStoryFromStorage(storyId);
+    } catch (err) {
+      console.warn(`  Storage cleanup failed (non-fatal): ${(err as Error).message}`);
+    }
   }
 
   console.log('\nRender complete.');

@@ -3,7 +3,6 @@ import {
   AbsoluteFill,
   Audio,
   Img,
-  Video,
   interpolate,
   Sequence,
   useCurrentFrame,
@@ -119,16 +118,7 @@ export const FacebookVideo: React.FC<FacebookVideoProps> = ({
           return (
             <div key={i} className="absolute inset-0" style={{ opacity }}>
               <Sequence from={startFrame} durationInFrames={durationFrames} layout="none">
-                {clip.isVideo ? (
-                  <Video
-                    src={clip.src}
-                    className="w-full h-full object-cover"
-                    playbackRate={1}
-                    volume={0}
-                  />
-                ) : (
-                  <KenBurnsImage src={clip.src} index={i} duration={durationFrames} />
-                )}
+                <KenBurnsImage src={clip.src} index={i} duration={durationFrames} />
               </Sequence>
             </div>
           );

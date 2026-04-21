@@ -54,9 +54,9 @@ export const THEMES: Theme[] = [
     facebookHashtags: '#drama #storytime #betrayal #relationship #shocking #mustread #UntoldLores',
     youtubeTags:
       'drama story, betrayal, relationship story, emotional story, animated drama, untold lores, story time, shocking story',
-    cliffhangerStyle: 'End each part with a shocking betrayal reveal or emotional gut-punch',
+    cliffhangerStyle: 'End each part with a shocking betrayal reveal, emotional gut-punch, or the moment the betrayer gets publicly exposed and destroyed',
     thumbnailMood: 'tearful, shocked, dramatic close-up, warm amber tones',
-    shortHookStyle: 'emotional build, voice breaking, devastating final reveal',
+    shortHookStyle: 'emotional build, voice breaking, devastating final reveal — or a satisfying face-slap moment where the audience cheers',
     videoMood: 'emotional, intense, dramatic',
     colorTint: 'rgba(255, 140, 0, 0.10)',
     themeColor: '#1a0800',
@@ -68,6 +68,9 @@ export const THEMES: Theme[] = [
       'He found the messages on her phone. The hotel. The same night she told him she was working late.',
       'My best friend of 20 years just testified against me in court. This is what really happened.',
       'He proposed in Paris. What he did not know was that her other boyfriend was waiting at the airport.',
+      'She humiliated me in front of 300 wedding guests. So I waited. And I made sure everyone found out the truth.',
+      'My sister stole my identity, my savings, and my fiancé. Then she invited me to her wedding.',
+      'They fired me on my birthday and laughed. Six months later I bought the company.',
     ],
   },
   {
@@ -80,9 +83,9 @@ export const THEMES: Theme[] = [
       '#motivation #inspiration #success #nevergiveup #mindset #storytime #UntoldLores',
     youtubeTags:
       'motivational story, inspiration, success story, underdog, animated motivation, untold lores, never give up, true story',
-    cliffhangerStyle: 'End each part at the lowest point or highest triumph',
+    cliffhangerStyle: 'End each part at the lowest point, the highest triumph, or the face-slap moment where everyone who doubted them watches them win in public',
     thumbnailMood: 'triumphant, golden light, determined face, rising sun, powerful pose',
-    shortHookStyle: 'building crescendo, powerful voice, triumphant final line',
+    shortHookStyle: 'building crescendo, powerful voice, triumphant final line — or a face-slap reveal that makes the audience want to stand up and cheer',
     videoMood: 'inspiring, uplifting, emotional',
     colorTint: 'rgba(255, 215, 0, 0.10)',
     themeColor: '#1a1400',
@@ -94,6 +97,9 @@ export const THEMES: Theme[] = [
       'At 38, he lost his job, his house, and his family in the same month. Three years later he employs 200 people.',
       'He was told he would never walk again. He ran a marathon 18 months later.',
       'Everyone in his village laughed when he said he would go to university. He went to Oxford.',
+      'My boss told me I was too stupid to ever lead a team. I became his boss two years later.',
+      'They cut me from the team and gave my spot to the coach\'s nephew. I made it to the national team. He didn\'t.',
+      'She laughed when I said I\'d pay back every cent. I handed her a check in front of the same people who watched her humiliate me.',
     ],
   },
   {

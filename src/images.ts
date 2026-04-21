@@ -2,7 +2,6 @@ import fetch from 'node-fetch';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
-import { animateImagesForScene } from './animate';
 
 const PEXELS_API_KEY = process.env.PEXELS_API_KEY!;
 const HF_API_TOKEN = process.env.HUGGINGFACE_API_TOKEN!;
@@ -305,12 +304,9 @@ export async function fetchImagesForPart(
       }
     }
 
-    // Animate each image with Stable Video Diffusion
-    console.log(`  Scene ${scene.scene_number}: animating ${localPaths.length} images with SVD...`);
-    const clipPaths = await animateImagesForScene(localPaths, outputDir, sceneIdx);
-
     for (let i = 0; i < localPaths.length; i++) {
-      const clipPath = clipPaths[i] || localPaths[i];
+      const existingClip = path.join(outputDir, `scene_${scene.scene_number}_clip_${i}.mp4`);
+      const clipPath = fs.existsSync(existingClip) ? existingClip : localPaths[i];
       const isVideo = clipPath.endsWith('.mp4');
       allImages.push({
         url: localPaths[i],
