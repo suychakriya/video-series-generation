@@ -87,6 +87,7 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
     const imageDir = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'images');
     const narrationPath = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'narration.mp3');
     if (ON_GITHUB_ACTIONS || !fs.existsSync(imageDir) || !fs.existsSync(narrationPath)) {
+      if (ON_GITHUB_ACTIONS && fs.existsSync(imageDir)) fs.rmSync(imageDir, { recursive: true });
       await downloadStoryAssets(storyId, partNum);
     }
 
