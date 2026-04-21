@@ -148,14 +148,11 @@ async function downloadFolder(
   storagePrefix: string,
   localDir: string
 ): Promise<void> {
-  const { data: files, error } = await sb.storage.from(STORAGE_BUCKET).list(storagePrefix);
-  if (error || !files || files.length === 0) {
-    fs.mkdirSync(localDir, { recursive: true });
-    return;
-  }
-
+  const { data: files, error } = await sb.storage.from(STORAGE_BUCKET).list(storagePrefix, { limit: 1000 });
   fs.mkdirSync(localDir, { recursive: true });
+  if (error || !files || files.length === 0) return;
 
+  console.log(`    Downloading ${files.length} files from ${storagePrefix}...`);
   for (const file of files) {
     if (file.name === '.emptyFolderPlaceholder') continue;
     const { data, error: dlError } = await sb.storage
