@@ -120,7 +120,11 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
       throw new Error(`Audio file not found: ${audioPath}`);
     }
 
-    const dramaticImageUrl = record.dramatic_image_url || images[images.length - 1]?.localPath;
+    const storedDramatic = record.dramatic_image_url;
+    const lastImage = images[images.length - 1]?.localPath;
+    const dramaticImageUrl = (storedDramatic && fs.existsSync(storedDramatic))
+      ? storedDramatic
+      : lastImage;
     if (!dramaticImageUrl) {
       throw new Error(`No dramatic image found for part ${partNum}`);
     }
