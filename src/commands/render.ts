@@ -18,12 +18,14 @@ function loadImagesForPart(storyId: string, partNum: number): ImageResult[] {
     throw new Error(`Images directory not found: ${imageDir}`);
   }
   const files = fs.readdirSync(imageDir)
-    .filter((f) => f.match(/^scene_\d+_\d+\.jpg$/))
+    .filter((f) => f.match(/^scene_\d+_\d+\.jpg$/) && fs.existsSync(path.join(imageDir, f)))
     .sort((a, b) => {
       const [sceneA, imgA] = a.match(/scene_(\d+)_(\d+)/)!.slice(1).map(Number);
       const [sceneB, imgB] = b.match(/scene_(\d+)_(\d+)/)!.slice(1).map(Number);
       return sceneA !== sceneB ? sceneA - sceneB : imgA - imgB;
     });
+
+  console.log(`  Found ${files.length} images: ${files[0]} … ${files[files.length - 1]}`);
 
   return files.map((f, i) => {
     const localPath = path.join(imageDir, f);
@@ -89,6 +91,8 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
     if (ON_GITHUB_ACTIONS || !fs.existsSync(imageDir) || !fs.existsSync(narrationPath)) {
       if (ON_GITHUB_ACTIONS && fs.existsSync(imageDir)) fs.rmSync(imageDir, { recursive: true });
       await downloadStoryAssets(storyId, partNum);
+      const downloaded = fs.existsSync(imageDir) ? fs.readdirSync(imageDir).filter(f => f.endsWith('.jpg')) : [];
+      console.log(`  Verified ${downloaded.length} jpg files in images dir after download`);
     }
 
     console.log(`\n--- Part ${partNum}/4 ---`);

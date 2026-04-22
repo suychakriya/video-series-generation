@@ -160,6 +160,7 @@ async function downloadFolder(
       .download(`${storagePrefix}/${file.name}`);
     if (dlError || !data) throw new Error(`Download failed (${storagePrefix}/${file.name}): ${dlError?.message}`);
     const buf = Buffer.from(await data.arrayBuffer());
+    if (buf.length === 0) throw new Error(`Downloaded empty file: ${storagePrefix}/${file.name}`);
     fs.writeFileSync(path.join(localDir, file.name), buf);
   }
 }
