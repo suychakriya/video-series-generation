@@ -217,20 +217,7 @@ export async function getPlaylistId(storyId: string): Promise<string | null> {
 }
 
 export async function getLatestScheduledPostDate(): Promise<string | null> {
-  if (LOCAL_MODE) {
-    const { allStoryIds, readStoryFile } = require('./local-database') as any;
-    // read all local parts and find max post_date
-    let maxDate: string | null = null;
-    for (const storyId of allStoryIds()) {
-      const parts = readStoryFile(storyId);
-      for (const p of parts) {
-        if (p.post_date && (!maxDate || p.post_date > maxDate)) {
-          maxDate = p.post_date;
-        }
-      }
-    }
-    return maxDate;
-  }
+  // Always query Supabase — local JSON files may be missing stories that exist only in Supabase
   const { data, error } = await supabase()
     .from('stories')
     .select('post_date')
