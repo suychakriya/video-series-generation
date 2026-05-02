@@ -87,7 +87,7 @@ export const FacebookVideo: React.FC<FacebookVideoProps> = ({
     return '';
   }, [currentImageIndex, scenes, storyTitle, partNumber, totalParts]);
 
-  const captionFadeFrames = fps * 0.5;
+  const captionFadeFrames = Math.min(fps * 0.5, Math.floor(currentClipDuration / 2) - 1);
   const captionOpacity = interpolate(
     frameInClip,
     [0, captionFadeFrames, currentClipDuration - captionFadeFrames, currentClipDuration],

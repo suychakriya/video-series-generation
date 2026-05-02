@@ -29,17 +29,11 @@ export async function runStory(): Promise<void> {
   const story = await generateFullStory(theme, storyId);
   console.log(`Story: "${story.overall_title}"`);
 
-  // Set post dates — start after the latest scheduled post, or tomorrow if none
+  // Start the day after the latest scheduled post, or tomorrow if none
   const latestPostDate = await getLatestScheduledPostDate();
-  const startDate = new Date();
-  if (latestPostDate) {
-    // Start the day after the last scheduled post
-    startDate.setTime(new Date(latestPostDate + 'T00:00:00').getTime());
-    startDate.setDate(startDate.getDate() + 1);
-  } else {
-    // No existing scheduled posts — start tomorrow
-    startDate.setDate(startDate.getDate() + 1);
-  }
+  const base = latestPostDate ? new Date(latestPostDate + 'T00:00:00') : new Date();
+  const startDate = new Date(base);
+  startDate.setDate(base.getDate() + 1);
   const tomorrow = startDate;
 
   for (let i = 0; i < story.parts.length; i++) {

@@ -144,22 +144,37 @@ Choose a case with rich documentation so the 4-part structure can be filled with
     id: 'ghost_stories',
     name: 'Ghost Stories',
     stylePrompt:
-      'anime art style, soft volumetric lighting, eerie pale moonlight, cold misty atmosphere, dark shadowy background, expressive frightened faces, muted desaturated colors with ghostly blue-white highlights, dramatic shadows, high quality illustration, 8k, cinematic composition, translucent apparitions, flickering candlelight, abandoned rooms, creaking floorboards, old photographs',
-    voiceTone: 'calm and intimate, like telling a story around a campfire, deceptively casual tone that makes the horror hit harder, quiet dread building to a chilling final revelation',
-    facebookHashtags: '#ghoststory #paranormal #scarystory #horror #creepy #supernatural #UntoldLores #trueghoststory',
+      'horror anime art style, pitch black darkness, decomposing pale ghost with hollow sunken black eye sockets and grey cracked skin, visible dark veins under translucent flesh, cracked walls with blood writing, flickering dying candle throwing wild shadows, deep impenetrable darkness devouring the corners of every room, protagonist frozen with pure terror, wide white eyes, grotesque supernatural figures emerging from shadow, cold moonlight slicing through broken windows, 8k, highly detailed, visceral horror composition',
+    voiceTone: 'slow and deliberate, the voice of someone who survived something they cannot forget. Builds dread with every sentence. Drops to near-whisper at the most horrifying details. Never lets the audience feel safe. Pauses at the worst moments to let the horror sink in.',
+    facebookHashtags: '#ghoststory #paranormal #scarystory #horror #terrifying #supernatural #UntoldLores #haunted #trueghoststory',
     youtubeTags:
-      'ghost story, paranormal, supernatural, creepy story, horror narration, true ghost story, untold lores, scary story time, haunted, Reddit ghost story',
+      'ghost story, paranormal, supernatural, scary story, terrifying ghost story, horror narration, untold lores, haunted house, scariest ghost stories, true horror',
     cliffhangerStyle:
-      'End each part with a quiet, almost innocent detail that reframes everything — the reader suddenly realizes the danger was there all along, hiding in plain sight. The horror should feel inevitable in hindsight.',
-    thumbnailMood: 'pale and ghostly, cold blue-white tones, dim candlelight, a figure half-seen in shadow, unsettling stillness',
-    shortHookStyle: 'conversational and calm at first, then a single devastating final sentence that recontextualizes everything into something deeply wrong',
-    videoMood: 'unsettling, quietly eerie, slow dread',
-    colorTint: 'rgba(20, 40, 80, 0.18)',
-    themeColor: '#060d1a',
+      'End each part at the moment of maximum terror — the protagonist comes face to face with the entity, something reaches for them in the dark, or they realize with absolute certainty that it is in the room with them right now. The cliffhanger must leave the audience genuinely afraid to keep reading.',
+    thumbnailMood: 'pitch black background, pale ghost face with hollow black eyes staring directly at the viewer, single cold light across a face frozen in terror, visceral and deeply unsettling',
+    shortHookStyle: 'calm voice that drops to a near-whisper, building dread, then a single devastating sentence delivered in complete silence — the horror of what was already there',
+    videoMood: 'pitch black, suffocating dread, inescapable terror',
+    colorTint: 'rgba(5, 0, 15, 0.28)',
+    themeColor: '#050010',
     particleEffect: 'dust',
-    leadIn: "That's when I understood what I had actually seen...",
+    leadIn: "I don't know how to explain what I saw...",
     themeLabel: 'GHOST STORY',
-    themeEmoji: '👻',
+    themeEmoji: '💀',
+    storyInstructions: `Write a genuinely terrifying ghost story. This is not atmosphere — it is fear.
+
+The ghost or entity MUST be physically described in visceral, specific detail: its face, its hands, the way it moves, the sounds it makes, what the air feels like when it is near. Not "a dark shape" — specific horrible detail.
+
+The protagonist MUST come face to face with it. Not a glimpse. Not a feeling. A direct confrontation where they can see it clearly and cannot escape.
+
+Include at least one scene where the protagonist is alone in complete darkness with the entity very close, and they cannot run.
+
+Each part must escalate the dread. By Part 2 the reader should be uncomfortable. By Part 3 they should be afraid. By Part 4 they should be genuinely disturbed.
+
+The horror must be INESCAPABLE — not "I moved and it was fine" but something that follows, that waits, that wants something specific from this person.
+
+Write the physical experience of terror: the protagonist's body shaking, the cold that spreads from the corner, the sound that should not exist, the moment the entity's head turns slowly toward them in the dark.
+
+End each part at the worst possible moment — the moment of maximum horror, not a quiet reframe. The audience must not be able to stop reading.`,
     exampleOpenings: [
       'My mother told me never to open the basement door. One night I heard something down there — soft, whimpering, almost like a puppy. I was six years old and I wanted to see it so badly. I crept down a few steps in the dark. There was no puppy. My mother yanked me back so hard I fell, and she held me against her chest and would not stop shaking. She never yelled. Not once in my life had she ever raised her voice at me. She yelled that night. Later she gave me a warm cookie and stroked my hair until I stopped crying, and she told me very quietly never to go down there again. I did not ask her why the boy in the corner had been moving like that, or why he had no hands or feet, or why he had looked up at me and smiled.',
       'When my sister and I were children, our family rented an old farmhouse for two summers. We loved everything about it — the creaking floors, the apple tree, the way fog sat in the fields at dawn. But our favorite thing was the ghost. We called her Mother, because she felt like one. Some mornings we would wake to find a cup of warm milk on each of our nightstands that had not been there when we fell asleep. Mother worried we would get thirsty in the night. In the living room there was an antique chair kept against the back wall. Whenever we sat watching television or playing cards, the chair would inch slowly forward across the room toward us, moving when we were not looking directly at it. Sometimes we would turn around and find it had crossed the whole room. We always felt a little guilty pushing it back. Mother only wanted to be near us. Years later I found a newspaper archive about the farmhouse. The original owner was a widow who had lived alone after her children died. She had given them each a cup of poisoned milk in the night, then hanged herself from a beam in the living room. The photograph that ran in the paper showed the living room. Her body. And below her feet, placed exactly in the center of the room, was the chair.',

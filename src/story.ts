@@ -151,8 +151,8 @@ Respond with ONLY valid JSON in this exact format:
 
   const response = await retryWithBackoff(async () => {
     const stream = await client.messages.stream({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 32000,
+      model: 'claude-sonnet-4-6',
+      max_tokens: 64000,
       messages: [{ role: 'user', content: prompt }],
     });
     return stream.finalMessage();
@@ -195,8 +195,8 @@ Respond with ONLY valid JSON in this exact format:
     console.log('--- TOTAL LENGTH:', text.length, '---');
     console.log('JSON parse failed, retrying with correction prompt...');
     const correctionStream = await client.messages.stream({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 32000,
+      model: 'claude-sonnet-4-6',
+      max_tokens: 64000,
       messages: [
         { role: 'user', content: prompt },
         { role: 'assistant', content: text },
@@ -223,5 +223,3 @@ Respond with ONLY valid JSON in this exact format:
     parts: parsed.parts,
   };
 }
-
-
