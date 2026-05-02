@@ -3,6 +3,7 @@ dotenv.config();
 
 import { getLatestStory, getStoryPart, updateStoryPart, updatePartStatus } from '../database';
 import { fetchImagesForPart, generateHookImage } from '../images';
+import { getThemeById } from '../themes';
 
 export async function runImages(partArg?: number, storyArg?: string): Promise<void> {
   let storyId: string;
@@ -48,6 +49,8 @@ export async function runImages(partArg?: number, storyArg?: string): Promise<vo
       continue;
     }
 
+    const theme = getThemeById(record.theme);
+
     console.log(`  Fetching images (${part.scenes.length} scenes)...`);
     const { images, dramaticImageUrl } = await fetchImagesForPart(
       partNum,
@@ -55,7 +58,9 @@ export async function runImages(partArg?: number, storyArg?: string): Promise<vo
       record.style_prompt,
       record.character_description,
       record.image_seed,
-      storyId
+      storyId,
+      theme.imageStylePrefix,
+      record.entity_description
     );
 
     console.log(`  Generating hook image...`);
@@ -65,7 +70,9 @@ export async function runImages(partArg?: number, storyArg?: string): Promise<vo
       record.character_description,
       record.image_seed,
       storyId,
-      partNum
+      partNum,
+      theme.imageStylePrefix,
+      record.entity_description
     );
 
     // Update DB: dramatic_image_url, base_image_url, images_status

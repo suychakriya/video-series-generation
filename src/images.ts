@@ -180,7 +180,9 @@ export async function generateHookImage(
   characterDescription: string,
   imageSeed: number,
   storyId: string,
-  partNumber: number
+  partNumber: number,
+  imageStylePrefix?: string,
+  entityDescription?: string
 ): Promise<string> {
   const outputDir = path.join(process.cwd(), 'temp', storyId, `part_${partNumber}`, 'images');
   fs.mkdirSync(outputDir, { recursive: true });
@@ -194,10 +196,14 @@ export async function generateHookImage(
     .replace(/\b(like|as)\s+(a|an|the)\s+\w+(\s+\w+){0,3}/gi, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
+  const prefix = imageStylePrefix || 'anime art style, cel shading, 2D illustration';
+  // Hook images always show the entity if one exists (it's the scariest moment)
+  const entityPart = entityDescription ? entityDescription.slice(0, 120).trim() : '';
   const prompt = [
-    'anime art style, cel shading, 2D illustration',
+    prefix,
     cleanHook.slice(0, 250),
     charPart ? `consistent character: ${charPart}` : '',
+    entityPart ? `consistent entity: ${entityPart}` : '',
     atmosphere,
     'cinematic composition, dramatic lighting, intense cliffhanger moment, masterpiece, highly detailed',
   ].filter(Boolean).join(', ');
@@ -219,11 +225,13 @@ export async function generateHookImage(
 
 export async function fetchImagesForPart(
   partNumber: number,
-  scenes: Array<{ scene_number: number; keywords: string[]; description: string; show_character?: boolean }>,
+  scenes: Array<{ scene_number: number; keywords: string[]; description: string; show_character?: boolean; show_entity?: boolean }>,
   stylePrompt: string,
   characterDescription: string,
   imageSeed: number,
-  storyId: string
+  storyId: string,
+  imageStylePrefix?: string,
+  entityDescription?: string
 ): Promise<{ images: ImageResult[]; dramaticImageUrl: string }> {
   const outputDir = path.join(process.cwd(), 'temp', storyId, `part_${partNumber}`, 'images');
   fs.mkdirSync(outputDir, { recursive: true });
@@ -254,11 +262,16 @@ export async function fetchImagesForPart(
     const atmosphere = stylePrompt.trim();
     const actionKeywords = scene.keywords.slice(0, 5).join(', ');
     const charPart = characterWeightForScene(scene.description, characterDescription, scene.show_character);
+    const entityPart = (scene.show_entity && entityDescription)
+      ? entityDescription.slice(0, 120).trim()
+      : '';
+    const stylePrefix = imageStylePrefix || 'anime art style, cel shading, 2D illustration';
     const prompt = [
-      'anime art style, cel shading, 2D illustration',
+      stylePrefix,
       sceneAction,
       actionKeywords,
       charPart ? `consistent character: ${charPart}` : '',
+      entityPart ? `consistent entity: ${entityPart}` : '',
       atmosphere,
       'cinematic composition, rule of thirds, dramatic lighting, masterpiece, highly detailed',
     ].filter(Boolean).join(', ');

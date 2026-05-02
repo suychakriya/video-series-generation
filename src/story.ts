@@ -10,6 +10,7 @@ export interface Scene {
   description: string;
   keywords: string[];
   show_character: boolean; // true = character is the main subject; false = focus on environment/object
+  show_entity?: boolean;   // true = the ghost/entity/monster is visually present in this scene
 }
 
 export interface StoryPart {
@@ -31,6 +32,7 @@ export interface FullStory {
   story_id: string;
   overall_title: string;
   character_description: string;
+  entity_description?: string; // ghost/monster/supernatural entity visual description (optional)
   style_prompt: string;
   image_seed: number;
   parts: StoryPart[];
@@ -102,6 +104,10 @@ REQUIREMENTS:
   city street), an object (a letter, a weapon, a door), a crowd shot, a wide establishing shot,
   or any moment where the atmosphere/setting matters more than the character's appearance.
   About 10-20% of scenes should have show_character: false for visual variety.
+- For each scene, set show_entity: true if the ghost, monster, or supernatural entity is visually
+  present and should appear in the image. Set show_entity: false for scenes where the entity is
+  not visible (protagonist alone, environment only, objects, flashbacks without the entity).
+  Only applies when entity_description is not null.
 - CRITICAL — descriptions are sent DIRECTLY to an image generator that takes every word LITERALLY:
   - NO metaphors, similes, or figurative language. If the narration says "she moved like a wave",
     the description must NOT say "wave" — say what the character is literally doing instead.
@@ -124,6 +130,7 @@ Respond with ONLY valid JSON in this exact format:
 {
   "overall_title": "string",
   "character_description": "string (highly specific physical description for image consistency — MUST include: unique face feature like scar/unusual eyes/jaw shape, exact hair style and color, specific clothing with color, approximate age, skin tone, build. Example: 'young man mid-20s, lean build, olive skin, sharp angular jaw, short messy dark brown hair with a streak of grey, deep-set amber eyes, wearing a worn dark teal jacket over a grey tunic, small scar above left eyebrow')",
+  "entity_description": "string or null (ONLY for stories with a ghost, monster, or recurring supernatural entity — describe its exact appearance in the same specific detail as character_description: skin color/texture, eye appearance, clothing or lack thereof, distinguishing features, how it moves. Example: 'tall female ghost, translucent pale grey rotting skin, black hollow eye sockets with thin red veins at the edges, cracked lips pulled back revealing grey teeth, long black matted hair partially covering her face, wearing a torn white burial dress stained dark at the hem, moves with a slow jerking motion as if her spine is broken'. Set to null if there is no recurring entity.)",
   "style_prompt": "string (specific visual style for this story)",
   "image_seed": number (random integer 1000-9999),
   "parts": [
@@ -139,7 +146,8 @@ Respond with ONLY valid JSON in this exact format:
           "narration": "string (the exact sentences from content spoken during this scene)",
           "description": "string (cinematic peak moment for image generation — literal visuals only, no metaphors)",
           "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
-          "show_character": true
+          "show_character": true,
+          "show_entity": false
         }
       ],
       "facebook_caption": "string",
@@ -218,6 +226,7 @@ Respond with ONLY valid JSON in this exact format:
     story_id: storyId,
     overall_title: parsed.overall_title,
     character_description: parsed.character_description,
+    entity_description: parsed.entity_description || undefined,
     style_prompt: parsed.style_prompt,
     image_seed: parsed.image_seed,
     parts: parsed.parts,

@@ -52,6 +52,7 @@ export async function runStory(): Promise<void> {
       hook: part.hook,
       thumbnail_title: part.thumbnail_title,
       character_description: story.character_description,
+      entity_description: story.entity_description,
       style_prompt: story.style_prompt,
       image_seed: story.image_seed,
       facebook_caption: part.facebook_caption,

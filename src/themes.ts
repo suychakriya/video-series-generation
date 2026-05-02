@@ -19,6 +19,9 @@ export interface Theme {
   // Optional: overrides the default "generate a fictional story" instruction.
   // Use for themes that must be factual (e.g. real documented events).
   storyInstructions?: string;
+  // Optional: overrides the hardcoded 'anime art style, cel shading, 2D illustration' prefix
+  // used at the start of every image generation prompt.
+  imageStylePrefix?: string;
 }
 
 export const THEMES: Theme[] = [
@@ -42,6 +45,7 @@ export const THEMES: Theme[] = [
     leadIn: 'And then... he realized...',
     themeLabel: 'HORROR',
     themeEmoji: '🔴',
+    imageStylePrefix: 'horror anime art style, cel shading, 2D illustration, dark terrifying atmosphere, blood splatter, pale terrified faces, grotesque monsters, pitch black shadows, visceral horror',
     exampleOpenings: [
       'He checked on the children at midnight. The beds were empty. But he could hear them laughing downstairs.',
       'He had been receiving voicemails from his dead father for three weeks.',
@@ -160,6 +164,7 @@ Choose a case with rich documentation so the 4-part structure can be filled with
     leadIn: "I don't know how to explain what I saw...",
     themeLabel: 'GHOST STORY',
     themeEmoji: '💀',
+    imageStylePrefix: 'horror anime art style, cel shading, 2D illustration, pale female ghost with blood streaming down her cracked decomposing face, hollow sunken black eye sockets, dark veins visible under translucent rotting skin, blood splatter on walls, pitch black suffocating darkness, victim frozen in absolute terror, wide white horror-struck eyes, grotesque supernatural entity emerging from shadow',
     storyInstructions: `Write a genuinely terrifying ghost story. This is not atmosphere — it is fear.
 
 The ghost or entity MUST be physically described in visceral, specific detail: its face, its hands, the way it moves, the sounds it makes, what the air feels like when it is near. Not "a dark shape" — specific horrible detail.
