@@ -12,7 +12,7 @@ import {
 export interface MainVideoProps {
   clips: Array<{ src: string; isVideo: boolean }>;
   clipTimings: Array<{ startFrame: number; durationFrames: number }>;
-  audioSrc: string;
+  audioSrcs: string[];
   content: string;
   scenes: Array<{ description: string; narration: string; imagesCount: number }>;
   partNumber: number;
@@ -88,7 +88,7 @@ const AIDisclosureCard: React.FC = () => {
 export const MainVideo: React.FC<MainVideoProps> = ({
   clips,
   clipTimings,
-  audioSrc,
+  audioSrcs,
   content,
   scenes,
   partNumber,
@@ -132,11 +132,12 @@ export const MainVideo: React.FC<MainVideoProps> = ({
     { extrapolateRight: 'clamp' }
   );
 
-  const isHookClip = currentImageIndex === clips.length - 1;
+  // clips order: [thumbnail, ...scenes, hookImage, hookImage(outro)]
+  const isHookClip = currentImageIndex === clips.length - 2;
+  const isOutroClip = currentImageIndex === clips.length - 1;
   const hookPulse = isHookClip
     ? interpolate(frame % (fps * 0.8), [0, fps * 0.4, fps * 0.8], [0.95, 1.05, 0.95])
     : 1;
-  const isLastSection = frame > durationInFrames - fps * 5;
 
   return (
     <AbsoluteFill className="bg-black">
@@ -146,11 +147,16 @@ export const MainVideo: React.FC<MainVideoProps> = ({
         if (!timing) return null;
         const { startFrame, durationFrames } = timing;
         const endFrame = startFrame + durationFrames;
-        if (frame < startFrame - fps || frame > endFrame + fps) return null;
-        const fadeFrames = Math.min(fps * 0.4, durationFrames * 0.15);
+        const crossFade = Math.round(Math.min(fps * 0.6, durationFrames * 0.2));
+        if (frame < startFrame - crossFade - 2 || frame > endFrame + crossFade + 2) return null;
         const opacity = interpolate(
           frame,
-          [startFrame, startFrame + fadeFrames, endFrame - fadeFrames, endFrame],
+          [
+            startFrame - crossFade,
+            startFrame + crossFade,
+            endFrame - crossFade,
+            endFrame + crossFade,
+          ],
           [0, 1, 1, 0],
           { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
         );
@@ -180,7 +186,7 @@ export const MainVideo: React.FC<MainVideoProps> = ({
       <PartBadge part={partNumber} total={totalParts} />
 
       {/* Scene narration caption */}
-      {!isHookClip && !isLastSection && sceneCaption && (
+      {!isHookClip && !isOutroClip && sceneCaption && (
         <div
           className="absolute bottom-20 left-0 right-0 text-center bg-black/65 px-12 py-2.5 z-[8]"
           style={{ opacity: captionOpacity }}
@@ -198,8 +204,8 @@ export const MainVideo: React.FC<MainVideoProps> = ({
         </div>
       )}
 
-      {/* Hook — pulsing near end */}
-      {isHookClip && !isLastSection && (
+      {/* Hook */}
+      {isHookClip && (
         <div
           className="absolute bottom-28 left-20 right-20 text-center"
           style={{
@@ -209,7 +215,6 @@ export const MainVideo: React.FC<MainVideoProps> = ({
             fontWeight: 700,
             lineHeight: 1.5,
             textShadow: '0 2px 12px rgba(0,0,0,1)',
-            transform: `scale(${hookPulse})`,
           }}
         >
           {hook}
@@ -217,7 +222,7 @@ export const MainVideo: React.FC<MainVideoProps> = ({
       )}
 
       {/* Final CTA */}
-      {isLastSection && (
+      {isOutroClip && (
         <div
           className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 gap-4 text-center"
           style={{ fontFamily: "'Cinzel', serif", color: '#FFD700', fontSize: 36, fontWeight: 700 }}
@@ -229,7 +234,17 @@ export const MainVideo: React.FC<MainVideoProps> = ({
         </div>
       )}
 
-      <Audio src={audioSrc} />
+      {/* Per-clip audio: each clip plays its own independent audio file from frame 0 */}
+      {clipTimings.map((timing, i) => (
+        <Sequence
+          key={i}
+          from={timing.startFrame}
+          durationInFrames={timing.durationFrames}
+          layout="none"
+        >
+          <Audio src={audioSrcs[i]} />
+        </Sequence>
+      ))}
     </AbsoluteFill>
   );
 };

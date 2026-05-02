@@ -21,6 +21,13 @@ export interface AudioTimings {
   outroDurationSec: number;
 }
 
+export interface AudioPaths {
+  introPath: string;
+  scenePaths: string[];
+  hookPath: string;
+  outroPath: string;
+}
+
 async function retryWithBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -39,17 +46,6 @@ export async function getExactAudioDuration(audioPath: string): Promise<number> 
     `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`
   );
   return parseFloat(stdout.trim());
-}
-
-// Concatenate multiple audio files into one using ffmpeg
-async function concatenateAudios(audioPaths: string[], outputPath: string): Promise<void> {
-  const listPath = outputPath + '.list.txt';
-  fs.writeFileSync(listPath, audioPaths.map((p) => `file '${p}'`).join('\n'));
-  try {
-    await execAsync(`ffmpeg -f concat -safe 0 -i "${listPath}" -c copy -y "${outputPath}"`);
-  } finally {
-    if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
-  }
 }
 
 
@@ -78,11 +74,20 @@ async function generateElevenLabsAudio(
   fs.writeFileSync(outputPath, await response.buffer());
 }
 
+async function applyAudioSpeed(filePath: string, speed: number): Promise<void> {
+  const tmp = filePath + '.tmp.mp3';
+  await execAsync(`ffmpeg -i "${filePath}" -filter:a "atempo=${speed}" -y "${tmp}"`);
+  fs.renameSync(tmp, filePath);
+}
+
 async function generateAudio(text: string, outputPath: string, isShort = false): Promise<void> {
   const provider = process.env.TTS_PROVIDER;
 
   if (provider === 'f5tts') {
     await generateF5TTS(text, outputPath);
+    // Apply speed post-processing in case the server ignores the speed param
+    const speed = parseFloat(process.env.F5TTS_SPEED || '0.85');
+    if (speed !== 1.0) await applyAudioSpeed(outputPath, speed);
     console.log('  Audio generated via F5-TTS ✅');
     return;
   }
@@ -103,7 +108,7 @@ export async function generateMainAudio(
   theme: Theme,
   storyTitle: string,
   storyId: string
-): Promise<{ audioPath: string; timings: AudioTimings }> {
+): Promise<{ audioPaths: AudioPaths; timings: AudioTimings }> {
   const outputDir = path.join(process.cwd(), 'temp', storyId, `part_${part.part}`);
   const sceneAudioDir = path.join(outputDir, 'scene_audios');
   fs.mkdirSync(sceneAudioDir, { recursive: true });
@@ -113,15 +118,12 @@ export async function generateMainAudio(
     part.part < 4 ? part.part + 1 : '1 of our next story'
   }. Like and subscribe for daily stories.`;
 
-  const allAudioPaths: string[] = [];
-
   // 1. Intro
   const introPath = path.join(sceneAudioDir, 'intro.mp3');
   if (!fs.existsSync(introPath)) {
     console.log(`  Generating intro audio...`);
     await generateAudio(brandedIntro, introPath);
   }
-  allAudioPaths.push(introPath);
 
   // 2. Per-scene narration
   const scenePaths: string[] = [];
@@ -133,7 +135,6 @@ export async function generateMainAudio(
       await generateAudio(scene.narration, scenePath);
     }
     scenePaths.push(scenePath);
-    allAudioPaths.push(scenePath);
   }
 
   // 3. Hook
@@ -142,7 +143,6 @@ export async function generateMainAudio(
     console.log(`  Generating hook audio...`);
     await generateAudio(part.hook, hookPath);
   }
-  allAudioPaths.push(hookPath);
 
   // 4. Outro
   const outroPath = path.join(sceneAudioDir, 'outro.mp3');
@@ -150,27 +150,22 @@ export async function generateMainAudio(
     console.log(`  Generating outro audio...`);
     await generateAudio(brandedOutro, outroPath);
   }
-  allAudioPaths.push(outroPath);
 
-  // 5. Concatenate all into final narration.mp3
-  const audioPath = path.join(outputDir, 'narration.mp3');
-  console.log(`  Concatenating ${allAudioPaths.length} audio segments...`);
-  await concatenateAudios(allAudioPaths, audioPath);
-
-  // 6. Measure exact durations
+  // 5. Measure exact durations
   const introDurationSec = await getExactAudioDuration(introPath);
   const sceneDurationsSec = await Promise.all(scenePaths.map(getExactAudioDuration));
   const hookDurationSec = await getExactAudioDuration(hookPath);
   const outroDurationSec = await getExactAudioDuration(outroPath);
 
   const timings: AudioTimings = { introDurationSec, sceneDurationsSec, hookDurationSec, outroDurationSec };
+  const audioPaths: AudioPaths = { introPath, scenePaths, hookPath, outroPath };
 
-  // 7. Cache timings to disk for --reuse
+  // 6. Cache timings to disk for --reuse
   const timingsPath = path.join(outputDir, 'timings.json');
   fs.writeFileSync(timingsPath, JSON.stringify(timings, null, 2));
 
   console.log(`  ✅ Audio ready — intro: ${introDurationSec.toFixed(1)}s, ${part.scenes.length} scenes, hook: ${hookDurationSec.toFixed(1)}s`);
-  return { audioPath, timings };
+  return { audioPaths, timings };
 }
 
 export async function generateKhmerAudio(
@@ -178,7 +173,7 @@ export async function generateKhmerAudio(
   _theme: Theme,
   _storyTitle: string,
   storyId: string
-): Promise<{ audioPath: string; timings: AudioTimings }> {
+): Promise<{ audioPaths: AudioPaths; timings: AudioTimings }> {
   const outputDir = path.join(process.cwd(), 'temp', storyId, `part_${part.part}`);
   const khmerAudioDir = path.join(outputDir, 'khmer_audios');
   fs.mkdirSync(khmerAudioDir, { recursive: true });
@@ -191,15 +186,12 @@ export async function generateKhmerAudio(
   const khmerRetry = (text: string, outputPath: string) =>
     retryWithBackoff(() => generateKhmerTTS(text, outputPath));
 
-  const allAudioPaths: string[] = [];
-
   // 1. Intro
   const introPath = path.join(khmerAudioDir, 'intro.mp3');
   if (!fs.existsSync(introPath)) {
     console.log(`  Generating Khmer intro audio...`);
     await khmerRetry(brandedIntro, introPath);
   }
-  allAudioPaths.push(introPath);
 
   // 2. Per-scene narration
   const scenePaths: string[] = [];
@@ -212,7 +204,6 @@ export async function generateKhmerAudio(
       await khmerRetry(text, scenePath);
     }
     scenePaths.push(scenePath);
-    allAudioPaths.push(scenePath);
   }
 
   // 3. Hook
@@ -222,7 +213,6 @@ export async function generateKhmerAudio(
     console.log(`  Generating Khmer hook audio...`);
     await khmerRetry(khmerHook, hookPath);
   }
-  allAudioPaths.push(hookPath);
 
   // 4. Outro
   const outroPath = path.join(khmerAudioDir, 'outro.mp3');
@@ -230,24 +220,19 @@ export async function generateKhmerAudio(
     console.log(`  Generating Khmer outro audio...`);
     await khmerRetry(brandedOutro, outroPath);
   }
-  allAudioPaths.push(outroPath);
 
-  // 5. Concatenate
-  const audioPath = path.join(outputDir, 'narration_khmer.mp3');
-  console.log(`  Concatenating ${allAudioPaths.length} Khmer audio segments...`);
-  await concatenateAudios(allAudioPaths, audioPath);
-
-  // 6. Measure durations
+  // 5. Measure durations
   const introDurationSec = await getExactAudioDuration(introPath);
   const sceneDurationsSec = await Promise.all(scenePaths.map(getExactAudioDuration));
   const hookDurationSec = await getExactAudioDuration(hookPath);
   const outroDurationSec = await getExactAudioDuration(outroPath);
 
   const timings: AudioTimings = { introDurationSec, sceneDurationsSec, hookDurationSec, outroDurationSec };
+  const audioPaths: AudioPaths = { introPath, scenePaths, hookPath, outroPath };
   fs.writeFileSync(path.join(outputDir, 'timings_khmer.json'), JSON.stringify(timings, null, 2));
 
   console.log(`  ✅ Khmer audio ready — intro: ${introDurationSec.toFixed(1)}s, ${part.scenes.length} scenes, hook: ${hookDurationSec.toFixed(1)}s`);
-  return { audioPath, timings };
+  return { audioPaths, timings };
 }
 
 export async function generateShortAudio(

@@ -53,9 +53,15 @@ async function retryWithBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promis
 export async function generateFullStory(theme: Theme, storyId: string): Promise<FullStory> {
   console.log(`\n📖 Generating full story for theme: ${theme.name}`);
 
+  const storyDirective = theme.storyInstructions
+    ? theme.storyInstructions
+    : `Generate a complete original fictional 4-part story for the theme: "${theme.name}"`;
+
   const prompt = `You are a master storyteller for "Untold Lores", a viral social media channel.
 
-Generate a complete 4-part story for the theme: "${theme.name}"
+${storyDirective}
+
+Theme: "${theme.name}"
 
 Style: ${theme.stylePrompt}
 Voice tone: ${theme.voiceTone}
@@ -63,6 +69,15 @@ Cliffhanger style: ${theme.cliffhangerStyle}
 
 Example openings for inspiration (don't copy directly):
 ${theme.exampleOpenings.map((e, i) => `${i + 1}. ${e}`).join('\n')}
+
+SUSPENSE & PLOT TWIST REQUIREMENTS (apply to every theme):
+- The story must be built on suspense. Every part must make the viewer desperate to know what happens next.
+  Plant questions early that don't get answered until later — who is this person really? what is being hidden? what does this mean?
+- Each part must contain at least one genuine plot twist or revelation that recontextualizes something the viewer thought they understood.
+  The best twists feel inevitable in hindsight — the clues were always there.
+- Use the "false floor" technique: give the viewer one explanation, let them settle into it, then pull it away.
+- Suspense builds from information gaps. Decide carefully what the viewer knows vs. what the character knows vs. what is hidden from both.
+- The overall 4-part arc must have a major twist or revelation in Part 3 or Part 4 that reframes the entire story.
 
 REQUIREMENTS:
 - The main protagonist MUST be male. All stories are narrated by a male voice,

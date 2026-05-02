@@ -100,7 +100,7 @@ async function generateHFImage(
   outputPath: string
 ): Promise<string> {
   const sceneAction = sceneDescription.slice(0, 250);
-  const atmosphere = stylePrompt.split(',').slice(0, 5).join(',').trim();
+  const atmosphere = stylePrompt.trim();
   const actionKeywords = sceneKeywords.slice(0, 5).join(', ');
   const charPart = characterWeightForScene(sceneDescription, characterDescription);
 
@@ -251,7 +251,7 @@ export async function fetchImagesForPart(
       .replace(/\s{2,}/g, ' ')
       .trim()
       .slice(0, 250);
-    const atmosphere = stylePrompt.split(',').slice(0, 5).join(',').trim();
+    const atmosphere = stylePrompt.trim();
     const actionKeywords = scene.keywords.slice(0, 5).join(', ');
     const charPart = characterWeightForScene(scene.description, characterDescription, scene.show_character);
     const prompt = [

@@ -19,9 +19,22 @@ async function translatePartToKhmer(
   facebookCaption: string,
   scenes: Array<{ scene_number: number; narration: string }>
 ): Promise<KhmerTranslation> {
-  const prompt = `Translate the following story content into natural, dramatic Khmer (ភាសាខ្មែរ).
-Keep the emotional tone, dramatic pacing, and storytelling style intact.
-Do NOT translate proper nouns, character names, or "Untold Lores".
+  const prompt = `You are translating story narration into Khmer for a social media video channel.
+
+STEP 1 — SIMPLIFY FIRST:
+Before translating, simplify the English text. The simplified version should:
+- Use short, clear sentences (no longer than 20 words each)
+- Remove complex vocabulary, idioms, and figurative language — replace with plain equivalents
+- Keep all the meaning, emotion, and dramatic impact intact
+- Be suitable for text-to-speech: natural rhythm, easy to read aloud
+Do NOT output the simplified English — use it only as the basis for your Khmer translation.
+
+STEP 2 — TRANSLATE TO KHMER:
+Translate the simplified text into natural, dramatic Khmer (ភាសាខ្មែរ).
+- Keep the emotional tone, dramatic pacing, and storytelling style intact
+- Use everyday Khmer vocabulary that a general audience can easily follow
+- Do NOT translate proper nouns, character names, or "Untold Lores"
+- Write for TTS: natural spoken rhythm, no overly formal or archaic Khmer
 
 Story title: ${title}
 Hook (cliffhanger ending): ${hook}

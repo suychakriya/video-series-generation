@@ -54,6 +54,7 @@ const RemotionRoot: React.FC = () => {
           clips: [],
           clipTimings: [],
           audioSrc: '',
+          audioStartFrames: [],
           scenes: [],
           partNumber: 1,
           totalParts: 4,

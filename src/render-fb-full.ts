@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { renderMainVideo } from './video/render';
 import { getThemeByIndex } from './themes';
+import type { AudioPaths } from './audio';
 
 async function main() {
   const storyId = 'test_1774161599611';
@@ -31,12 +32,21 @@ async function main() {
 
   const thumbnailPath = path.join(partDir, 'thumbnail.jpg');
   const hookImagePath = path.join(imageDir, 'hook_image.jpg');
-  const audioPath = path.join(partDir, 'narration.mp3');
+  const audioDir = path.join(partDir, 'scene_audios');
+  const audioPaths: AudioPaths = {
+    introPath: path.join(audioDir, 'intro.mp3'),
+    scenePaths: fs.readdirSync(audioDir)
+      .filter(f => /^scene_\d+\.mp3$/.test(f))
+      .sort((a, b) => parseInt(a.match(/scene_(\d+)/)![1]) - parseInt(b.match(/scene_(\d+)/)![1]))
+      .map(f => path.join(audioDir, f)),
+    hookPath: path.join(audioDir, 'hook.mp3'),
+    outroPath: path.join(audioDir, 'outro.mp3'),
+  };
 
   console.log(`Rendering Facebook full Part 1 (${images.length} scenes)...`);
 
   const outputPath = await renderMainVideo(
-    part, images, audioPath, theme,
+    part, images, audioPaths, theme,
     storyId, story.overall_title,
     thumbnailPath, hookImagePath, timings,
     'facebook'

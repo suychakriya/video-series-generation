@@ -132,7 +132,7 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
         await new Promise((r) => setTimeout(r, 30000));
         const allParts = await getAllPartUrls(story.story_id);
         const previousParts = allParts
-          .filter((p) => p.part < story.part && p.youtube_video_url)
+          .filter((p) => p.part < story.part && p.youtube_video_url?.includes('youtube.com'))
           .map((p) => ({
             part: p.part,
             url: p.youtube_video_url!,
@@ -195,7 +195,7 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
         await new Promise((r) => setTimeout(r, 30000));
         const allParts = await getAllPartUrls(story.story_id);
         const previousParts = allParts
-          .filter((p) => p.part < story.part && p.youtube_video_url)
+          .filter((p) => p.part < story.part && p.youtube_video_url?.includes('youtube.com'))
           .map((p) => ({ part: p.part, url: p.youtube_video_url! }));
         if (previousParts.length > 0) {
           console.log('  Posting previous parts comment on YouTube...');
@@ -211,7 +211,7 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
         if (p.youtube_video_id && p.youtube_video_id !== ytUploadResult.videoId) {
           try {
             const newDesc = `${story.youtube_description}\n\nFull Series:\n${allParts
-              .filter((pp) => pp.youtube_video_url)
+              .filter((pp) => pp.youtube_video_url?.includes('youtube.com'))
               .map((pp) => `Part ${pp.part}: ${pp.youtube_video_url}`)
               .join('\n')}`;
             await updateVideoDescription(p.youtube_video_id, newDesc);
@@ -248,7 +248,7 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
         await new Promise((r) => setTimeout(r, 30000));
         const allParts = await getAllPartUrls(story.story_id);
         const previousParts = allParts
-          .filter((p) => p.part < story.part && p.youtube_video_url)
+          .filter((p) => p.part < story.part && p.youtube_video_url?.includes('youtube.com'))
           .map((p) => ({
             part: p.part,
             url: p.youtube_video_url!,

@@ -6,9 +6,10 @@ import * as path from 'path';
 import { getLatestStory, getStoryPart, updatePartStatus, updateStoryPart } from '../database';
 import { getThemeById } from '../themes';
 import { renderMainVideo, renderThumbnail } from '../video/render';
-import { AudioTimings } from '../audio';
+import { AudioTimings, AudioPaths } from '../audio';
 import { ImageResult } from '../images';
 import { uploadVideo, uploadThumbnail, downloadStoryAssets, deleteStoryFromStorage } from '../storage';
+import { closeRenderServer } from '../video/render';
 
 const ON_GITHUB_ACTIONS = process.env.GITHUB_ACTIONS === 'true';
 
@@ -43,12 +44,35 @@ function loadImagesForPart(storyId: string, partNum: number): ImageResult[] {
   });
 }
 
-function loadTimingsForPart(storyId: string, partNum: number): AudioTimings {
-  const timingsPath = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'timings.json');
+function loadTimingsForPart(storyId: string, partNum: number, isKhmer = false): AudioTimings {
+  const file = isKhmer ? 'timings_khmer.json' : 'timings.json';
+  const timingsPath = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, file);
   if (!fs.existsSync(timingsPath)) {
     throw new Error(`Timings file not found: ${timingsPath}. Run audio generation first.`);
   }
   return JSON.parse(fs.readFileSync(timingsPath, 'utf-8')) as AudioTimings;
+}
+
+function loadAudioPathsForPart(storyId: string, partNum: number, isKhmer = false): AudioPaths {
+  const audioDir = path.join(
+    process.cwd(), 'temp', storyId, `part_${partNum}`,
+    isKhmer ? 'khmer_audios' : 'scene_audios'
+  );
+  if (!fs.existsSync(audioDir)) {
+    throw new Error(`Audio directory not found: ${audioDir}. Run audio generation first.`);
+  }
+  const introPath = path.join(audioDir, 'intro.mp3');
+  const hookPath = path.join(audioDir, 'hook.mp3');
+  const outroPath = path.join(audioDir, 'outro.mp3');
+  const scenePaths = fs.readdirSync(audioDir)
+    .filter((f) => /^scene_\d+\.mp3$/.test(f))
+    .sort((a, b) => {
+      const na = parseInt(a.match(/scene_(\d+)/)![1]);
+      const nb = parseInt(b.match(/scene_(\d+)/)![1]);
+      return na - nb;
+    })
+    .map((f) => path.join(audioDir, f));
+  return { introPath, scenePaths, hookPath, outroPath };
 }
 
 export async function runRender(partArg?: number, storyArg?: string): Promise<void> {
@@ -87,8 +111,8 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
 
     // Download assets from Supabase Storage (always on GitHub Actions, otherwise only if missing)
     const imageDir = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'images');
-    const narrationPath = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'narration.mp3');
-    if (ON_GITHUB_ACTIONS || !fs.existsSync(imageDir) || !fs.existsSync(narrationPath)) {
+    const audioReadyPath = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'scene_audios', 'intro.mp3');
+    if (ON_GITHUB_ACTIONS || !fs.existsSync(imageDir) || !fs.existsSync(audioReadyPath)) {
       if (ON_GITHUB_ACTIONS && fs.existsSync(imageDir)) fs.rmSync(imageDir, { recursive: true });
       await downloadStoryAssets(storyId, partNum);
       const downloaded = fs.existsSync(imageDir) ? fs.readdirSync(imageDir).filter(f => f.endsWith('.jpg')) : [];
@@ -114,11 +138,7 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
     // Load assets from disk
     const images = loadImagesForPart(storyId, partNum);
     const timings = loadTimingsForPart(storyId, partNum);
-
-    const audioPath = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'narration.mp3');
-    if (!fs.existsSync(audioPath)) {
-      throw new Error(`Audio file not found: ${audioPath}`);
-    }
+    const audioPaths = loadAudioPathsForPart(storyId, partNum);
 
     const storedDramatic = record.dramatic_image_url;
     const lastImage = images[images.length - 1]?.localPath;
@@ -149,28 +169,27 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
     // Render main video (YouTube 1920x1080)
     console.log(`  Rendering main video 1920x1080 (YouTube)...`);
     const mainVideoPath = await renderMainVideo(
-      storyPart, images, audioPath, theme, storyId, record.title,
+      storyPart, images, audioPaths, theme, storyId, record.title,
       thumbnailPath, hookImagePath, timings, 'landscape'
     );
 
     // Render Facebook video (1080x1350)
     console.log(`  Rendering Facebook video 1080x1350...`);
     const fbVideoPath = await renderMainVideo(
-      storyPart, images, audioPath, theme, storyId, record.title,
+      storyPart, images, audioPaths, theme, storyId, record.title,
       thumbnailPath, hookImagePath, timings, 'facebook'
     );
 
     // Render Khmer Facebook video if Khmer audio exists
-    const khmerAudioPath = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'narration_khmer.mp3');
+    const khmerAudioDir = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'khmer_audios');
     const khmerTimingsPath = path.join(process.cwd(), 'temp', storyId, `part_${partNum}`, 'timings_khmer.json');
     let khmerFbVideoPath: string | null = null;
 
-    if (fs.existsSync(khmerAudioPath) && fs.existsSync(khmerTimingsPath)) {
-      console.log(`  Waiting 5s for Remotion port to release...`);
-      await new Promise((r) => setTimeout(r, 5000));
+    if (fs.existsSync(path.join(khmerAudioDir, 'intro.mp3')) && fs.existsSync(khmerTimingsPath)) {
       console.log(`  Rendering Khmer Facebook video 1080x1350...`);
       try {
-        const khmerTimings = JSON.parse(fs.readFileSync(khmerTimingsPath, 'utf-8')) as AudioTimings;
+        const khmerAudioPaths = loadAudioPathsForPart(storyId, partNum, true);
+        const khmerTimings = loadTimingsForPart(storyId, partNum, true);
         const khmerStoryPart = {
           ...storyPart,
           hook: (record as any).khmer_hook || storyPart.hook,
@@ -181,7 +200,7 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
         };
         const khmerTitle = (record as any).khmer_title || record.title;
         khmerFbVideoPath = await renderMainVideo(
-          khmerStoryPart, images, khmerAudioPath, theme, storyId, khmerTitle,
+          khmerStoryPart, images, khmerAudioPaths, theme, storyId, khmerTitle,
           thumbnailPath, hookImagePath, khmerTimings, 'facebook', '_khmer'
         );
       } catch (err) {
@@ -240,6 +259,8 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
 
     console.log(`  Part ${partNum} render done`);
   }
+
+  await closeRenderServer();
 
   // Clean up Supabase Storage after all parts rendered (GitHub Actions only)
   if (ON_GITHUB_ACTIONS) {

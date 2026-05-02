@@ -46,7 +46,8 @@ export async function runStory(): Promise<void> {
     const part = story.parts[i];
     const postDate = new Date(tomorrow);
     postDate.setDate(postDate.getDate() + i);
-    const postDateStr = postDate.toISOString().split('T')[0];
+    // Use local date parts — toISOString() returns UTC which rolls back a day in UTC+ timezones
+    const postDateStr = `${postDate.getFullYear()}-${String(postDate.getMonth() + 1).padStart(2, '0')}-${String(postDate.getDate()).padStart(2, '0')}`;
 
     const recordId = await saveStoryPart({
       story_id: story.story_id,

@@ -53,7 +53,7 @@ export async function runAudio(partArg?: number, storyArg?: string): Promise<voi
     }
 
     console.log(`  Generating main audio...`);
-    const { audioPath } = await generateMainAudio(
+    await generateMainAudio(
       storyPart,
       theme,
       record.title,
@@ -74,7 +74,7 @@ export async function runAudio(partArg?: number, storyArg?: string): Promise<voi
 
     await updatePartStatus(record.id, { audio_status: 'done' });
 
-    console.log(`  Part ${partNum} audio done: ${audioPath}`);
+    console.log(`  Part ${partNum} audio done`);
   }
 
   console.log('\nAudio generation complete.');

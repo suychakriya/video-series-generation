@@ -12,7 +12,7 @@ import {
 export interface FacebookVideoProps {
   clips: Array<{ src: string; isVideo: boolean }>;
   clipTimings: Array<{ startFrame: number; durationFrames: number }>;
-  audioSrc: string;
+  audioSrcs: string[];
   scenes: Array<{ narration: string }>;
   partNumber: number;
   totalParts: number;
@@ -22,17 +22,21 @@ export interface FacebookVideoProps {
 }
 
 const cinzel: React.CSSProperties = { fontFamily: "'Cinzel', serif" };
+// Khmer text needs a font that contains Khmer Unicode glyphs. Noto Sans Khmer is installed
+// on the GitHub Actions runner via fonts-noto-hinted; it also covers Latin as a fallback.
+const captionFont: React.CSSProperties = { fontFamily: "'Noto Sans Khmer', 'Cinzel', serif" };
 const gold = '#FFD700';
 
-const KenBurnsImage: React.FC<{ src: string; index: number; duration: number }> = ({
-  src,
-  index,
-  duration,
-}) => {
+const KenBurnsImage: React.FC<{
+  src: string;
+  index: number;
+  duration: number;
+  isHook?: boolean;
+}> = ({ src, index, duration, isHook = false }) => {
   const frame = useCurrentFrame();
   const progress = Math.min(frame / duration, 1);
-  const scale = interpolate(progress, [0, 1], [1.0, 1.08]);
-  const translateX = interpolate(progress, [0, 1], [0, index % 2 === 0 ? -15 : 15]);
+  const scale = isHook ? 1 : interpolate(progress, [0, 1], [1.0, 1.08]);
+  const translateX = isHook ? 0 : interpolate(progress, [0, 1], [0, index % 2 === 0 ? -15 : 15]);
 
   return (
     <div className="w-full h-full overflow-hidden">
@@ -48,7 +52,7 @@ const KenBurnsImage: React.FC<{ src: string; index: number; duration: number }> 
 export const FacebookVideo: React.FC<FacebookVideoProps> = ({
   clips,
   clipTimings,
-  audioSrc,
+  audioSrcs,
   scenes,
   partNumber,
   totalParts,
@@ -72,13 +76,14 @@ export const FacebookVideo: React.FC<FacebookVideoProps> = ({
   const frameInClip = currentClipTiming ? Math.max(0, frame - currentClipTiming.startFrame) : 0;
   const currentClipDuration = currentClipTiming?.durationFrames ?? fps * 10;
 
-  const isHookClip = currentImageIndex === clips.length - 1;
-  const isLastSection = frame > durationInFrames - fps * 5;
+  // clips order: hookImage(0), thumbnail(1), ...scenes..., hookImage(last-1), hookImage(last=outro)
+  const isHookClip = currentImageIndex === 0 || currentImageIndex === clips.length - 2;
+  const isOutroClip = currentImageIndex === clips.length - 1;
 
   const sceneCaption = React.useMemo(() => {
-    if (currentImageIndex === 0) return `"${storyTitle}" — Part ${partNumber} of ${totalParts}`;
-    const sceneIdx = currentImageIndex - 1;
-    if (sceneIdx < scenes.length) return scenes[sceneIdx].narration;
+    if (currentImageIndex === 1) return `"${storyTitle}" — Part ${partNumber} of ${totalParts}`;
+    const sceneIdx = currentImageIndex - 2;
+    if (sceneIdx >= 0 && sceneIdx < scenes.length) return scenes[sceneIdx].narration;
     return '';
   }, [currentImageIndex, scenes, storyTitle, partNumber, totalParts]);
 
@@ -118,7 +123,12 @@ export const FacebookVideo: React.FC<FacebookVideoProps> = ({
           return (
             <div key={i} className="absolute inset-0" style={{ opacity }}>
               <Sequence from={startFrame} durationInFrames={durationFrames} layout="none">
-                <KenBurnsImage src={clip.src} index={i} duration={durationFrames} />
+                <KenBurnsImage
+                  src={clip.src}
+                  index={i}
+                  duration={durationFrames}
+                  isHook={i === 0 || i === clips.length - 2 || i === clips.length - 1}
+                />
               </Sequence>
             </div>
           );
@@ -170,11 +180,11 @@ export const FacebookVideo: React.FC<FacebookVideoProps> = ({
         }}
       >
         {/* Scene caption */}
-        {!isHookClip && !isLastSection && sceneCaption && (
+        {!isHookClip && !isOutroClip && sceneCaption && (
           <p
             className="text-center leading-relaxed m-0 font-semibold"
             style={{
-              ...cinzel,
+              ...captionFont,
               color: gold,
               fontSize: 34,
               textShadow: '0 1px 6px rgba(0,0,0,1)',
@@ -186,7 +196,7 @@ export const FacebookVideo: React.FC<FacebookVideoProps> = ({
         )}
 
         {/* Hook */}
-        {isHookClip && !isLastSection && (
+        {isHookClip && (
           <p
             className="text-center leading-normal m-0 font-bold"
             style={{
@@ -194,7 +204,6 @@ export const FacebookVideo: React.FC<FacebookVideoProps> = ({
               color: gold,
               fontSize: 34,
               textShadow: '0 2px 12px rgba(0,0,0,1)',
-              transform: `scale(${hookPulse})`,
             }}
           >
             {hook}
@@ -202,7 +211,7 @@ export const FacebookVideo: React.FC<FacebookVideoProps> = ({
         )}
 
         {/* Final CTA */}
-        {isLastSection && (
+        {isOutroClip && (
           <div className="text-center">
             <div className="font-bold" style={{ ...cinzel, color: gold, fontSize: 36 }}>
               ⚜️ UNTOLD LORES
@@ -214,7 +223,17 @@ export const FacebookVideo: React.FC<FacebookVideoProps> = ({
         )}
       </div>
 
-      <Audio src={audioSrc} />
+      {/* Per-clip audio: each clip plays its own independent audio file from frame 0 */}
+      {clipTimings.map((timing, i) => (
+        <Sequence
+          key={i}
+          from={timing.startFrame}
+          durationInFrames={timing.durationFrames}
+          layout="none"
+        >
+          <Audio src={audioSrcs[i]} />
+        </Sequence>
+      ))}
     </AbsoluteFill>
   );
 };

@@ -9,10 +9,12 @@ export async function generateF5TTS(text: string, outputPath: string): Promise<v
   const ngrokUrl = process.env.F5TTS_NGROK_URL;
   if (!ngrokUrl) throw new Error('F5TTS_NGROK_URL is not set in .env');
 
+  const speed = parseFloat(process.env.F5TTS_SPEED || '0.85');
+
   const response = await fetch(`${ngrokUrl.replace(/\/$/, '')}/f5tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, speed }),
   });
 
   if (!response.ok) {
