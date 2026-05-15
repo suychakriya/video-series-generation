@@ -9,6 +9,7 @@ import { runGenerate } from './commands/generate';
 import { runSync } from './commands/sync';
 import { runPost } from './commands/post';
 import { runTranslate } from './commands/translate';
+import { runImportStory } from './commands/import-story';
 
 function parsePartArg(args: string[]): number | undefined {
   const idx = args.indexOf('--part');
@@ -35,6 +36,11 @@ async function main(): Promise<void> {
   switch (command) {
     case 'story': {
       await runStory();
+      break;
+    }
+
+    case 'import-story': {
+      await runImportStory(args[1]);
       break;
     }
 

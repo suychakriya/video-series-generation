@@ -8,6 +8,7 @@ import {
   getCurrentThemeIndex,
   incrementThemeIndex,
   getLatestScheduledPostDate,
+  getRecentStoryTitlesByTheme,
 } from '../database';
 
 function generateStoryId(): string {
@@ -26,7 +27,12 @@ export async function runStory(): Promise<void> {
   const theme = getThemeByIndex(themeIndex);
   console.log(`Theme: ${theme.name}`);
 
-  const story = await generateFullStory(theme, storyId);
+  const recentTitles = await getRecentStoryTitlesByTheme(theme.id, 10);
+  if (recentTitles.length > 0) {
+    console.log(`  Avoiding ${recentTitles.length} recent title(s) for this theme`);
+  }
+
+  const story = await generateFullStory(theme, storyId, recentTitles);
   console.log(`Story: "${story.overall_title}"`);
 
   // Start the day after the latest scheduled post, or tomorrow if none

@@ -8,6 +8,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { StoryRecord } from './database';
+import { THEMES } from './themes';
 
 const DB_PATH = path.join(process.cwd(), 'temp', 'db.json');
 const STORIES_DIR = path.join(process.cwd(), 'temp', 'stories');
@@ -170,7 +171,7 @@ export function getCurrentThemeIndexLocal(): number {
 
 export function incrementThemeIndexLocal(): void {
   const db = readGlobalDB();
-  db.themeIndex = (db.themeIndex + 1) % 5;
+  db.themeIndex = (db.themeIndex + 1) % THEMES.length;
   writeGlobalDB(db);
 }
 
@@ -184,6 +185,21 @@ export function getOrCreatePlaylistLocal(storyId: string, storyTitle: string, th
 
 export function getPlaylistIdLocal(storyId: string): string | null {
   return readGlobalDB().playlists.find((p) => p.story_id === storyId)?.playlist_id ?? null;
+}
+
+export function getRecentStoryTitlesByThemeLocal(themeId: string, limit: number): string[] {
+  if (!fs.existsSync(STORIES_DIR)) return [];
+  const ids = allStoryIds();
+  const titles: string[] = [];
+  for (const id of ids) {
+    const parts = readStoryFile(id);
+    const part1 = parts.find((p) => p.part === 1 && p.theme === themeId);
+    if (part1?.title) {
+      titles.push(part1.title);
+      if (titles.length >= limit) break;
+    }
+  }
+  return titles;
 }
 
 export function saveRunStatsLocal(_stats: object): void {

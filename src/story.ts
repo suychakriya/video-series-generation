@@ -52,17 +52,50 @@ async function retryWithBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promis
   throw new Error('Max retries exceeded');
 }
 
-export async function generateFullStory(theme: Theme, storyId: string): Promise<FullStory> {
+function pickRandom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+export async function generateFullStory(
+  theme: Theme,
+  storyId: string,
+  recentTitles: string[] = []
+): Promise<FullStory> {
   console.log(`\n📖 Generating full story for theme: ${theme.name}`);
 
   const storyDirective = theme.storyInstructions
     ? theme.storyInstructions
     : `Generate a complete original fictional 4-part story for the theme: "${theme.name}"`;
 
+  // Build variation blocks
+  let seedBlock = '';
+  if (theme.storySeeds) {
+    const setting = pickRandom(theme.storySeeds.settings);
+    const protagonist = pickRandom(theme.storySeeds.protagonistTypes);
+    const premise = pickRandom(theme.storySeeds.premises);
+    console.log(`  Seed — Setting: ${setting.slice(0, 60)}...`);
+    console.log(`  Seed — Protagonist: ${protagonist.slice(0, 60)}...`);
+    console.log(`  Seed — Premise: ${premise.slice(0, 60)}...`);
+    seedBlock = `
+STORY VARIATION DIRECTIVE — you MUST build this story around ALL THREE of these specifics:
+- Setting: ${setting}
+- Protagonist: ${protagonist}
+- Core premise: ${premise}
+
+Do not substitute or ignore any of these. The setting, protagonist background, and core premise must be the foundation of the story from the very first sentence.`;
+  }
+
+  const avoidBlock = recentTitles.length > 0
+    ? `\nRECENTLY GENERATED STORIES FOR THIS THEME — do NOT write a story similar to any of these:
+${recentTitles.map((t) => `- "${t}"`).join('\n')}
+`
+    : '';
+
   const prompt = `You are a master storyteller for "Untold Lores", a viral social media channel.
 
 ${storyDirective}
-
+${seedBlock}
+${avoidBlock}
 Theme: "${theme.name}"
 
 Style: ${theme.stylePrompt}
@@ -89,10 +122,12 @@ REQUIREMENTS:
   Latin American, etc. Match the name to the story's setting and atmosphere, not the visual style.
   The visual style (anime art) is for images only — it does not dictate the story's culture.
 - Each part: 800-1000 words
-- Each part has as many scenes as the story naturally requires (min 5, max 40).
-  Each scene covers 1-3 sentences of the story. Break the story into scenes at every
-  meaningful narrative shift — a new location, a new revelation, a new emotional beat.
-  More scenes = better image-to-voice sync, so err toward more scenes.
+- Each part has as many scenes as the story naturally requires (min 20, max 60).
+  Each scene covers ONE short sentence only — maximum 25 words per narration.
+  This keeps every scene's audio under 10 seconds. If a sentence exceeds 25 words,
+  split it naturally across two scenes. Break the story into scenes at every sentence —
+  one sentence per scene is the default. Never combine two sentences into one scene.
+  More scenes = better image-to-voice sync. Always err toward more scenes, never fewer.
 - CRITICAL: Every sentence of the content MUST appear in exactly one scene's narration.
   The narration fields across all scenes, concatenated in order, must equal the full content
   word-for-word. No sentence may be skipped or duplicated.

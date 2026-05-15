@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import * as local from './local-database';
+import { THEMES } from './themes';
 
 const LOCAL_MODE = process.env.LOCAL_MODE === 'true';
 
@@ -164,14 +165,15 @@ export async function getCurrentThemeIndex(): Promise<number> {
 export async function incrementThemeIndex(): Promise<void> {
   if (LOCAL_MODE) return local.incrementThemeIndexLocal();
   const current = await getCurrentThemeIndex();
-  const next = (current + 1) % 5;
-  const { data } = await supabase().from('theme_tracker').select('id').limit(1).single();
-  if (data?.id) {
-    await supabase()
-      .from('theme_tracker')
-      .update({ current_theme_index: next, last_updated: new Date().toISOString() })
-      .eq('id', data.id);
-  }
+  const next = (current + 1) % THEMES.length;
+  const { data, error: selectError } = await supabase().from('theme_tracker').select('id').limit(1).maybeSingle();
+  if (selectError) throw new Error(`Failed to read theme_tracker: ${selectError.message}`);
+  if (!data?.id) throw new Error('No row found in theme_tracker — cannot increment theme index');
+  const { error: updateError } = await supabase()
+    .from('theme_tracker')
+    .update({ current_theme_index: next, last_updated: new Date().toISOString() })
+    .eq('id', data.id);
+  if (updateError) throw new Error(`Failed to update theme_tracker: ${updateError.message}`);
 }
 
 export async function getOrCreatePlaylist(
@@ -261,6 +263,19 @@ export async function updatePartStatus(
   if (LOCAL_MODE) return local.updatePartStatusLocal(id, updates);
   const { error } = await supabase().from('stories').update(updates).eq('id', id);
   if (error) throw new Error(`DB update error: ${error.message}`);
+}
+
+export async function getRecentStoryTitlesByTheme(themeId: string, limit: number): Promise<string[]> {
+  if (LOCAL_MODE) return local.getRecentStoryTitlesByThemeLocal(themeId, limit);
+  const { data, error } = await supabase()
+    .from('stories')
+    .select('title')
+    .eq('theme', themeId)
+    .eq('part', 1)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return data.map((r: any) => r.title).filter(Boolean);
 }
 
 export async function saveRunStats(stats: {

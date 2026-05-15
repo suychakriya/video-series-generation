@@ -22,6 +22,13 @@ export interface Theme {
   // Optional: overrides the hardcoded 'anime art style, cel shading, 2D illustration' prefix
   // used at the start of every image generation prompt.
   imageStylePrefix?: string;
+  // Optional: pools of random story seeds injected per generation to force variety.
+  // Not used for factual themes (unexplained_events) since the real case provides uniqueness.
+  storySeeds?: {
+    settings: string[];
+    protagonistTypes: string[];
+    premises: string[];
+  };
 }
 
 export const THEMES: Theme[] = [
@@ -46,6 +53,44 @@ export const THEMES: Theme[] = [
     themeLabel: 'HORROR',
     themeEmoji: '🔴',
     imageStylePrefix: 'horror anime art style, cel shading, 2D illustration, dark terrifying atmosphere, blood splatter, pale terrified faces, grotesque monsters, pitch black shadows, visceral horror',
+    storySeeds: {
+      settings: [
+        'remote mountain research station cut off by early snowfall, no signal, one exit',
+        'suburban neighborhood where three families have disappeared without explanation over five years',
+        'overnight express train crossing a desert — no stops for fourteen hours, nowhere to go',
+        'isolated island resort that the ferry inexplicably stopped servicing two months ago',
+        'abandoned chemical plant being demolished by a skeleton crew working nights only',
+        'private psychiatric clinic that only accepts referrals from a specific list of doctors',
+        'small coastal town where the fishing fleet returned to harbor with no crew aboard',
+        'luxury high-rise apartment building where none of the residents ever seem to leave',
+        'closed border crossing checkpoint that has been sealed to the public for six months',
+        'long-haul trucking route through empty rural backroads, three days with no other traffic',
+      ],
+      protagonistTypes: [
+        'private investigator in his 50s, hired by a family who believe their loved one was murdered and staged as an accident',
+        'forensic accountant who discovers numbers in a client\'s books that should not be possible',
+        'ex-military contractor working private security for a corporation he knows almost nothing about',
+        'insomniac emergency room doctor who starts noticing the same pattern of injuries across patients with no connection to each other',
+        'journalist who receives an anonymous tip pointing to a person who was officially declared dead twice',
+        'data recovery specialist hired to wipe a hard drive who reads what is on it first',
+        'criminal defense lawyer assigned a client who appears to need no defending and will not explain why',
+        'newly hired hotel manager who finds his predecessor\'s hidden records locked in a basement office',
+        'air traffic controller who receives a radio transmission from a flight number that landed three years ago',
+        'government archivist assigned to destroy a batch of old classified documents who reads them before shredding',
+      ],
+      premises: [
+        'a message meant for someone else lands with the protagonist and contains information that puts his life at risk',
+        'someone the protagonist has trusted completely for years is exposed as something entirely different from who he believed',
+        'a cold case produces new physical evidence that points directly at someone alive, nearby, and watching',
+        'several unconnected people are being methodically erased from all records — digital, physical, photographic — one by one',
+        'the same fatal accident has happened to the same family in the same location across three generations',
+        'the protagonist discovers he has been under continuous surveillance for years and has no idea why',
+        'an inheritance arrives with conditions attached that reveal the family has been concealing something catastrophic',
+        'two strangers discover their entire lives were shaped by decisions made by the same unknown person',
+        'the protagonist is the only person who remembers a specific event that everyone else insists never happened',
+        'a list of names is shrinking — one every few weeks — and the protagonist\'s name is on it',
+      ],
+    },
     exampleOpenings: [
       'He checked on the children at midnight. The beds were empty. But he could hear them laughing downstairs.',
       'He had been receiving voicemails from his dead father for three weeks.',
@@ -165,6 +210,50 @@ Choose a case with rich documentation so the 4-part structure can be filled with
     themeLabel: 'GHOST STORY',
     themeEmoji: '💀',
     imageStylePrefix: 'horror anime art style, cel shading, 2D illustration, pale female ghost with blood streaming down her cracked decomposing face, hollow sunken black eye sockets, dark veins visible under translucent rotting skin, blood splatter on walls, pitch black suffocating darkness, victim frozen in absolute terror, wide white horror-struck eyes, grotesque supernatural entity emerging from shadow',
+    storySeeds: {
+      settings: [
+        '1970s apartment block in Hong Kong — narrow corridors, paper-thin walls, twelfth floor, lift that stops on its own',
+        'abandoned tuberculosis sanatorium in the rural Philippines, overgrown with jungle, last used in 1968',
+        'old colonial plantation house in Malaysia built in the 1890s on land that was a mass grave',
+        'remote mountain resort in Japan accessible only by a single mountain road that floods in heavy rain',
+        'fishing village on the northern coast of Thailand where half the population left overnight in 1983 and never came back',
+        'decommissioned Soviet-era sanatorium in the Caucasus mountains, never officially closed, now used as cheap dormitory housing',
+        'converted shophouse in Penang — three floors, six tenants, one back room that has been locked since the building was purchased',
+        'isolated lighthouse on a small island off the Irish coast, automated in 1978, accessed by supply boat twice a year',
+        'public housing estate in Singapore — Block 13, Floor 13, Unit 13 — empty for four years despite a housing shortage',
+        'traditional Korean hanok in the old quarter of Seoul, surrounded by modern construction, the last building left standing on the block',
+        'decommissioned rural orphanage in Cambodia, closed under circumstances that were never officially explained',
+        'underground bunker built beneath a Vietnamese village, sealed after the war, recently reopened during road construction',
+      ],
+      protagonistTypes: [
+        'night shift security guard, early 40s, recently divorced, not sleeping well, assigned to an empty building alone',
+        'documentary filmmaker making a low-budget piece on urban legends who starts to believe what he is filming',
+        'young male teacher newly assigned to a school in a remote village, staying in the building\'s staff quarters',
+        'building contractor hired to renovate the property who finds things inside the walls that should not be there',
+        'nurse doing overnight rotations at a severely understaffed rural care home with long-term residents',
+        'journalist investigating a cold case disappearance from the 1980s involving this specific location',
+        'university student house-sitting for his parents who are abroad, alone in the family home for the first time',
+        'elderly man returning to the house where he grew up to settle his recently deceased mother\'s estate',
+        'social worker sent to make a welfare check on an isolated elderly resident who stopped returning calls',
+        'caretaker hired by a property agency to watch an empty estate while it awaits sale after the last owner died intestate',
+        'local police officer called to investigate noise complaints at a building that has been vacant for three years',
+        'young archivist hired to catalogue old records discovered bricked up in a building\'s basement during renovations',
+      ],
+      premises: [
+        'something that was physically sealed inside a room forty years ago has gotten out and is still in the building',
+        'a person who died violently in this building keeps appearing in the background of photographs taken here',
+        'the protagonist keeps waking up in a part of the building he has no memory of going to',
+        'a child begins describing in exact detail someone\'s death that occurred in this place before the child was born',
+        'an audio recording made in this building contains sounds that were not audible at the time of recording',
+        'every single person who has lived in this specific room has died in the same room, in the same position',
+        'the previous occupant left behind a series of increasingly desperate warnings that no one took seriously',
+        'something in the building responds when spoken to directly, and it is learning how to speak back',
+        'the protagonist is being methodically led toward a specific place in the building — one room closer each night',
+        'a face that belongs to no living person keeps appearing at the same window at the same time',
+        'the building\'s layout is changing — rooms that existed two days ago are gone, new ones have appeared',
+        'whatever haunts this place has followed the same family across generations and has just found the next one',
+      ],
+    },
     storyInstructions: `Write a genuinely terrifying ghost story. This is not atmosphere — it is fear.
 
 The ghost or entity MUST be physically described in visceral, specific detail: its face, its hands, the way it moves, the sounds it makes, what the air feels like when it is near. Not "a dark shape" — specific horrible detail.
@@ -206,6 +295,44 @@ End each part at the worst possible moment — the moment of maximum horror, not
     leadIn: 'And in that instant, everything changed...',
     themeLabel: 'FANTASY',
     themeEmoji: '✨',
+    storySeeds: {
+      settings: [
+        'ancient empire in its final decade — magic is visibly dying and no one can explain why',
+        'underground kingdom built to survive a catastrophe that passed centuries ago, but the exits have been sealed from inside',
+        'desert civilization built directly above a buried god that has begun, very slowly, to move',
+        'archipelago where each island exists in a different century and the tides between them carry travelers through time',
+        'mountain kingdom whose king has not aged in two hundred years, and whose court is more afraid of him than anything outside the walls',
+        'city that exists only between midnight and dawn — it vanishes with the light, along with everyone still inside',
+        'ancient forest cursed by a dying mage who hid the only method to break it somewhere inside',
+        'floating island nation that has been slowly descending for a hundred years and is now close enough to see the ground',
+        'walled city under siege for thirty years whose inhabitants have stopped asking why the siege began',
+        'monastery that serves as the only prison capable of holding what is locked in its deepest level',
+      ],
+      protagonistTypes: [
+        'disgraced general stripped of rank and given one final impossible mission as a chance at redemption',
+        'court scholar who uncovers proof that the kingdom\'s founding history — and everything built on it — is a fabrication',
+        'common soldier who survives a battle that both sides have been ordered to deny ever took place',
+        'former royal executioner who carried out a sentence and has since become certain the condemned man was innocent',
+        'merchant whose most recent cargo turns out to be something he was never meant to know existed',
+        'spy who has been so deep undercover for so long he genuinely no longer knows which side he is loyal to',
+        'healer who can cure any wound or illness except the one slowly killing the person he loves most',
+        'orphan whose entire life — family, education, every opportunity — was engineered by someone with a plan he was never told about',
+        'royal cartographer hired to map a territory that is measurably different every time he returns to it',
+        'convicted criminal given his freedom in exchange for a task that becomes more impossible the further into it he gets',
+      ],
+      premises: [
+        'the prophecy the entire kingdom has built its identity around turns out to describe the villain, not the hero',
+        'the weapon that can end the war can only be used once, and it is currently held by the wrong person for the wrong reason',
+        'the chosen one is a manufactured construct — deliberately selected, trained, and positioned — and has no special power at all',
+        'the price of the kingdom\'s greatest magical strength is being paid by people who never consented to pay it',
+        'a centuries-old peace agreement is broken and no one alive can remember what it was actually protecting everyone from',
+        'the protagonist discovers that his enemy has been correct about everything, and his own side has been lying since before he was born',
+        'a dying god has chosen the protagonist as its successor, which means inheriting everything — including what destroyed it',
+        'the catastrophe the entire story has been building toward turns out to be the wrong problem entirely',
+        'the curse that was presented as a punishment was the only thing keeping something far worse contained',
+        'two people who have spent years trying to kill each other discover they are the only two who can stop what is coming',
+      ],
+    },
     exampleOpenings: [
       'The kingdom had been at peace for 100 years. The peace ended the night he was born.',
       'He was the last dragon hunter. Until the day he discovered he was half dragon.',

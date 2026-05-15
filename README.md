@@ -39,9 +39,9 @@ auto-story-video/
 │   │   ├── sync.ts             — (unused) VPS sync
 │   │   └── post.ts             — Post to Facebook + YouTube
 │   ├── story.ts                — Claude story generation logic
-│   ├── themes.ts               — 5 theme definitions
-│   ├── images.ts               — Image generation (HuggingFace API)
-│   ├── audio.ts                — Audio generation (F5-TTS / ElevenLabs)
+│   ├── themes.ts               — 4 active theme definitions (Horror & Thriller, Real Unexplained Events, Ghost Stories, Dark Fantasy)
+│   ├── images.ts               — Image generation (local Kaggle/Colab server → HuggingFace → Pexels fallback)
+│   ├── audio.ts                — Audio generation (F5-TTS / ElevenLabs) + Khmer audio
 │   ├── f5-tts.ts               — F5-TTS client (Google Colab server)
 │   ├── khmer-tts.ts            — Khmer TTS client (edge-tts via Colab server)
 │   ├── video/
@@ -49,6 +49,7 @@ auto-story-video/
 │   │   ├── Root.tsx            — Remotion root
 │   │   ├── MainVideo.tsx       — 1920×1080 YouTube composition
 │   │   ├── FacebookVideo.tsx   — 1080×1350 Facebook composition
+│   │   ├── Short.tsx           — 1080×1920 YouTube Shorts composition
 │   │   ├── Thumbnail.tsx       — 1280×720 thumbnail
 │   │   └── style.css           — Video styles
 │   ├── database.ts             — Supabase CRUD (routes to local-database.ts when LOCAL_MODE=true)
@@ -60,6 +61,8 @@ auto-story-video/
 │   └── auth-google.ts          — Re-authenticate Google OAuth (YouTube + Drive scopes)
 ├── colab_tts_server.ipynb      — Combined TTS server (F5-TTS + Khmer) on Google Colab
 ├── colab_server.ipynb          — Image/animation server (FLUX + SVD) on Google Colab
+├── kaggle_image_server.ipynb   — Image generation server (FLUX.1-schnell) on Kaggle
+├── kaggle_svd_server.ipynb     — Video animation server (SVD) on Kaggle
 ├── .github/workflows/
 │   ├── post.yml                — Daily post cron (9am UTC)
 │   └── generate.yml            — Manual story generation
@@ -154,6 +157,7 @@ npm run post -- --youtube-only
 
 ```bash
 npx ts-node src/auth-google.ts                  # Re-authenticate Google OAuth
+npm run seed-local                              # Seed local JSON DB with test data
 ```
 
 ---
@@ -186,6 +190,15 @@ Set `LOCAL_MODE=true` in `.env` to store story data locally instead of Supabase:
 | `true` | `temp/stories/{story_id}.json` | Skipped (files stay local) |
 
 `npm run upload` always uses real Supabase + Drive regardless of `LOCAL_MODE`.
+
+---
+
+## Story Generation Features
+
+- **entity_description** — For ghost/monster themes (`ghost_stories`, `horror_thriller`), Claude generates a detailed visual description of the supernatural entity. This is injected into every scene's image prompt where `show_entity: true`, keeping the entity visually consistent across all scenes in the story.
+- **storySeeds** — Each theme with `storySeeds` defined gets a random `setting`, `protagonistType`, and `premise` injected per generation run. This forces variety and prevents Claude from defaulting to similar story structures.
+- **imageStylePrefix** — Each theme can override the default `anime art style, cel shading` prefix used in image generation prompts (e.g. horror themes use a darker image style prefix).
+- **show_character / show_entity** — Per-scene flags set by Claude during story generation. `show_character: false` skips the character description in the image prompt (for environment/object-focused shots). `show_entity: true` injects the entity description.
 
 ---
 
@@ -265,11 +278,13 @@ ANTHROPIC_API_KEY=
 
 # Image generation
 HUGGINGFACE_API_TOKEN=
-LOCAL_MODEL_URL=              # ngrok URL from Kaggle image server (optional)
+LOCAL_MODEL_URL=              # ngrok URL from Kaggle/Colab image server (optional — preferred over HuggingFace)
+PEXELS_API_KEY=               # Pexels fallback if both local server and HuggingFace fail (optional)
 
 # TTS — set TTS_PROVIDER=f5tts to use Colab, otherwise falls back to ElevenLabs
 TTS_PROVIDER=f5tts
 F5TTS_NGROK_URL=              # ngrok URL from colab_tts_server.ipynb
+F5TTS_SPEED=0.85              # speech rate for F5-TTS (default 0.85, applied via ffmpeg post-processing)
 KHMER_TTS_NGROK_URL=          # same URL as F5TTS_NGROK_URL
 
 # ElevenLabs (fallback if TTS_PROVIDER is not f5tts)
@@ -334,6 +349,7 @@ create table stories (
   hook text not null,
   thumbnail_title text,
   character_description text not null,
+  entity_description text,
   style_prompt text not null,
   scenes jsonb,
   image_seed integer not null,
