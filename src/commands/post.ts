@@ -115,9 +115,10 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
       if (youtubeOnly) return null;
 
       console.log('\nPosting to Facebook...');
+      const fbCaption = `${story.youtube_title}\n${story.facebook_caption}`;
       const result = await postVideoToFacebook(
         localFbVideoPath,
-        story.facebook_caption,
+        fbCaption,
         story.title
       );
       await updateStoryPart(story.id!, {
@@ -231,10 +232,12 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
       console.log('\nPosting Khmer video to Facebook...');
       const khmerCaption = story.khmer_facebook_caption;
       if (!khmerCaption) throw new Error('khmer_facebook_caption is missing — cannot post Khmer video with English caption');
+      const khmerTitle = story.khmer_title || story.title;
+      const khmerFullCaption = `${story.youtube_title}\n${khmerCaption}`;
       const result = await postVideoToFacebook(
         localKhmerFbVideoPath,
-        khmerCaption,
-        story.khmer_title || story.title
+        khmerFullCaption,
+        khmerTitle
       );
       await updateStoryPart(story.id!, {
         khmer_facebook_post_id: result.postId,
