@@ -35,6 +35,7 @@ async function main() {
   const audioDir = path.join(partDir, 'scene_audios');
   const audioPaths: AudioPaths = {
     introPath: path.join(audioDir, 'intro.mp3'),
+    openingHookPath: path.join(audioDir, 'opening_hook.mp3'),
     scenePaths: fs.readdirSync(audioDir)
       .filter(f => /^scene_\d+\.mp3$/.test(f))
       .sort((a, b) => parseInt(a.match(/scene_(\d+)/)![1]) - parseInt(b.match(/scene_(\d+)/)![1]))

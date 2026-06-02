@@ -23,6 +23,8 @@ export interface MainVideoProps {
   };
   storyTitle: string;
   hook: string;
+  openingHook: string;
+  isLastPart: boolean;
 }
 
 const WaterMark: React.FC = () => (
@@ -96,6 +98,8 @@ export const MainVideo: React.FC<MainVideoProps> = ({
   theme,
   storyTitle,
   hook,
+  openingHook,
+  isLastPart,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -114,13 +118,14 @@ export const MainVideo: React.FC<MainVideoProps> = ({
   const currentClipDuration = currentClipTiming?.durationFrames ?? fps * 10;
 
   const sceneCaption = React.useMemo(() => {
-    // index 0 = intro thumbnail, indices 1..N = scenes, last = hook
-    if (currentImageIndex === 0) {
+    // index 0 = opening hook, index 1 = intro thumbnail, indices 2..N+1 = scenes
+    if (currentImageIndex === 0) return ''; // opening hook — hook text shown separately
+    if (currentImageIndex === 1) {
       return `Welcome to Untold Lores. "${storyTitle}" — Part ${partNumber} of 4.`;
     }
     if (!scenes || scenes.length === 0) return '';
-    const sceneIdx = currentImageIndex - 1; // shift by 1 to skip intro clip
-    if (sceneIdx < scenes.length) return scenes[sceneIdx].narration;
+    const sceneIdx = currentImageIndex - 2; // shift by 2 to skip opening hook + intro
+    if (sceneIdx >= 0 && sceneIdx < scenes.length) return scenes[sceneIdx].narration;
     return '';
   }, [currentImageIndex, scenes, storyTitle, partNumber]);
 
@@ -132,8 +137,9 @@ export const MainVideo: React.FC<MainVideoProps> = ({
     { extrapolateRight: 'clamp' }
   );
 
-  // clips order: [thumbnail, ...scenes, hookImage, hookImage(outro)]
-  const isHookClip = currentImageIndex === clips.length - 2;
+  // clips order: [openingHook, thumbnail, ...scenes, endingHook(Parts 1-3), outro]
+  const isOpeningHookClip = currentImageIndex === 0;
+  const isHookClip = !isLastPart && currentImageIndex === clips.length - 2;
   const isOutroClip = currentImageIndex === clips.length - 1;
   const hookPulse = isHookClip
     ? interpolate(frame % (fps * 0.8), [0, fps * 0.4, fps * 0.8], [0.95, 1.05, 0.95])
@@ -204,8 +210,8 @@ export const MainVideo: React.FC<MainVideoProps> = ({
         </div>
       )}
 
-      {/* Hook */}
-      {isHookClip && (
+      {/* Hook text — opening hook at start, ending cliffhanger at end (Parts 1-3) */}
+      {(isOpeningHookClip || isHookClip) && (
         <div
           className="absolute bottom-28 left-20 right-20 text-center"
           style={{
@@ -217,7 +223,7 @@ export const MainVideo: React.FC<MainVideoProps> = ({
             textShadow: '0 2px 12px rgba(0,0,0,1)',
           }}
         >
-          {hook}
+          {isOpeningHookClip ? openingHook : hook}
         </div>
       )}
 

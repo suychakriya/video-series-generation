@@ -17,6 +17,7 @@ const execAsync = (cmd: string) =>
 export interface AudioTimings {
   introDurationSec: number;
   sceneDurationsSec: number[];
+  openingHookDurationSec: number;
   hookDurationSec: number;
   outroDurationSec: number;
 }
@@ -24,6 +25,7 @@ export interface AudioTimings {
 export interface AudioPaths {
   introPath: string;
   scenePaths: string[];
+  openingHookPath: string;
   hookPath: string;
   outroPath: string;
 }
@@ -137,34 +139,44 @@ export async function generateMainAudio(
     scenePaths.push(scenePath);
   }
 
-  // 3. Hook
-  const hookPath = path.join(sceneAudioDir, 'hook.mp3');
-  if (!fs.existsSync(hookPath)) {
-    console.log(`  Generating hook audio...`);
-    await generateAudio(part.hook, hookPath);
+  // 3. Opening hook
+  const openingHookPath = path.join(sceneAudioDir, 'opening_hook.mp3');
+  if (!fs.existsSync(openingHookPath)) {
+    console.log(`  Generating opening hook audio...`);
+    await generateAudio(part.opening_hook, openingHookPath);
   }
 
-  // 4. Outro
+  // 4. Ending hook (Parts 1-3 only)
+  const hookPath = path.join(sceneAudioDir, 'hook.mp3');
+  if (part.part < 4) {
+    if (!fs.existsSync(hookPath)) {
+      console.log(`  Generating hook audio...`);
+      await generateAudio(part.hook, hookPath);
+    }
+  }
+
+  // 5. Outro
   const outroPath = path.join(sceneAudioDir, 'outro.mp3');
   if (!fs.existsSync(outroPath)) {
     console.log(`  Generating outro audio...`);
     await generateAudio(brandedOutro, outroPath);
   }
 
-  // 5. Measure exact durations
+  // 6. Measure exact durations
   const introDurationSec = await getExactAudioDuration(introPath);
   const sceneDurationsSec = await Promise.all(scenePaths.map(getExactAudioDuration));
-  const hookDurationSec = await getExactAudioDuration(hookPath);
+  const openingHookDurationSec = await getExactAudioDuration(openingHookPath);
+  const hookDurationSec = part.part < 4 ? await getExactAudioDuration(hookPath) : 0;
   const outroDurationSec = await getExactAudioDuration(outroPath);
 
-  const timings: AudioTimings = { introDurationSec, sceneDurationsSec, hookDurationSec, outroDurationSec };
-  const audioPaths: AudioPaths = { introPath, scenePaths, hookPath, outroPath };
+  const timings: AudioTimings = { introDurationSec, sceneDurationsSec, openingHookDurationSec, hookDurationSec, outroDurationSec };
+  const audioPaths: AudioPaths = { introPath, scenePaths, openingHookPath, hookPath, outroPath };
 
   // 6. Cache timings to disk for --reuse
   const timingsPath = path.join(outputDir, 'timings.json');
   fs.writeFileSync(timingsPath, JSON.stringify(timings, null, 2));
 
-  console.log(`  ✅ Audio ready — intro: ${introDurationSec.toFixed(1)}s, ${part.scenes.length} scenes, hook: ${hookDurationSec.toFixed(1)}s`);
+  console.log(`  ✅ Audio ready — intro: ${introDurationSec.toFixed(1)}s, ${part.scenes.length} scenes, opening hook: ${openingHookDurationSec.toFixed(1)}s, hook: ${hookDurationSec.toFixed(1)}s`);
   return { audioPaths, timings };
 }
 
@@ -206,32 +218,42 @@ export async function generateKhmerAudio(
     scenePaths.push(scenePath);
   }
 
-  // 3. Hook
-  const khmerHook = part.khmer_hook || part.hook;
-  const hookPath = path.join(khmerAudioDir, 'hook.mp3');
-  if (!fs.existsSync(hookPath)) {
-    console.log(`  Generating Khmer hook audio...`);
-    await khmerRetry(khmerHook, hookPath);
+  // 3. Opening hook
+  const openingHookPath = path.join(khmerAudioDir, 'opening_hook.mp3');
+  if (!fs.existsSync(openingHookPath)) {
+    console.log(`  Generating Khmer opening hook audio...`);
+    await khmerRetry(part.opening_hook, openingHookPath);
   }
 
-  // 4. Outro
+  // 4. Ending hook (Parts 1-3 only)
+  const khmerHook = part.khmer_hook || part.hook;
+  const hookPath = path.join(khmerAudioDir, 'hook.mp3');
+  if (part.part < 4) {
+    if (!fs.existsSync(hookPath)) {
+      console.log(`  Generating Khmer hook audio...`);
+      await khmerRetry(khmerHook, hookPath);
+    }
+  }
+
+  // 5. Outro
   const outroPath = path.join(khmerAudioDir, 'outro.mp3');
   if (!fs.existsSync(outroPath)) {
     console.log(`  Generating Khmer outro audio...`);
     await khmerRetry(brandedOutro, outroPath);
   }
 
-  // 5. Measure durations
+  // 6. Measure durations
   const introDurationSec = await getExactAudioDuration(introPath);
   const sceneDurationsSec = await Promise.all(scenePaths.map(getExactAudioDuration));
-  const hookDurationSec = await getExactAudioDuration(hookPath);
+  const openingHookDurationSec = await getExactAudioDuration(openingHookPath);
+  const hookDurationSec = part.part < 4 ? await getExactAudioDuration(hookPath) : 0;
   const outroDurationSec = await getExactAudioDuration(outroPath);
 
-  const timings: AudioTimings = { introDurationSec, sceneDurationsSec, hookDurationSec, outroDurationSec };
-  const audioPaths: AudioPaths = { introPath, scenePaths, hookPath, outroPath };
+  const timings: AudioTimings = { introDurationSec, sceneDurationsSec, openingHookDurationSec, hookDurationSec, outroDurationSec };
+  const audioPaths: AudioPaths = { introPath, scenePaths, openingHookPath, hookPath, outroPath };
   fs.writeFileSync(path.join(outputDir, 'timings_khmer.json'), JSON.stringify(timings, null, 2));
 
-  console.log(`  ✅ Khmer audio ready — intro: ${introDurationSec.toFixed(1)}s, ${part.scenes.length} scenes, hook: ${hookDurationSec.toFixed(1)}s`);
+  console.log(`  ✅ Khmer audio ready — intro: ${introDurationSec.toFixed(1)}s, ${part.scenes.length} scenes, opening hook: ${openingHookDurationSec.toFixed(1)}s, hook: ${hookDurationSec.toFixed(1)}s`);
   return { audioPaths, timings };
 }
 

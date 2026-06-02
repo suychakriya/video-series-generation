@@ -7,6 +7,24 @@ const PEXELS_API_KEY = process.env.PEXELS_API_KEY!;
 const HF_API_TOKEN = process.env.HUGGINGFACE_API_TOKEN!;
 const LOCAL_MODEL_URL = process.env.LOCAL_MODEL_URL; // Colab/RunPod server
 
+// Strips entity/character content phrases from stylePrompt for non-entity scenes.
+// Keeps art style, lighting, color palette, and quality modifiers only.
+function filterStyleForScene(stylePrompt: string, showEntity: boolean): string {
+  if (showEntity) return stylePrompt.trim();
+
+  // For non-entity scenes, keep only art style, lighting, color, and quality tokens.
+  // Strip anything describing characters, monsters, blood, gore, or horror content.
+  const contentWords = /ghost|skeleton|monster|entity|creature|decompos|corpse|blood|gore|decaying|rotting|supernatural|protagonist|frozen with|wide.*eye|hollow|socket|vein|flesh|cracked.*skin|broken jaw|matted hair|burial|dead body|pale.*rotting|terror|horrif|visceral horror/i;
+
+  const filtered = stylePrompt
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0 && !contentWords.test(t))
+    .join(', ');
+
+  return filtered || stylePrompt.trim();
+}
+
 // Returns the character description if the scene should show the character, empty string otherwise.
 // Uses the show_character flag set by Claude during story generation.
 // Falls back to a keyword heuristic for older stories that don't have the flag.
@@ -92,28 +110,10 @@ async function generateLocalImage(
 
 // PRIMARY (cloud): HuggingFace FLUX.1-schnell — anime style, good quality
 async function generateHFImage(
-  stylePrompt: string,
-  sceneDescription: string,
-  sceneKeywords: string[],
-  characterDescription: string,
+  prompt: string,
   seed: number,
   outputPath: string
 ): Promise<string> {
-  const sceneAction = sceneDescription.slice(0, 250);
-  const atmosphere = stylePrompt.trim();
-  const actionKeywords = sceneKeywords.slice(0, 5).join(', ');
-  const charPart = characterWeightForScene(sceneDescription, characterDescription);
-
-  const prompt = [
-    'donghua anime, cel shading, 2D illustration',
-    sceneAction,
-    actionKeywords,
-    charPart,
-    atmosphere,
-    'cinematic composition, rule of thirds, dramatic lighting, masterpiece, highly detailed',
-  ]
-    .filter(Boolean)
-    .join(', ');
 
   const response = await fetch(HF_IMAGE_MODEL, {
     method: 'POST',
@@ -127,7 +127,7 @@ async function generateHFImage(
         width: 1280,
         height: 720,
         seed,
-        num_inference_steps: 4, // schnell is optimized for 4 steps
+        num_inference_steps: 8,
       },
     }),
   });
@@ -190,30 +190,33 @@ export async function generateHookImage(
 
   if (fs.existsSync(outputPath)) return outputPath;
 
-  const atmosphere = stylePrompt.split(',').slice(0, 5).join(',').trim();
-  const charPart = characterWeightForScene(hook, characterDescription);
   const cleanHook = hook
     .replace(/\b(like|as)\s+(a|an|the)\s+\w+(\s+\w+){0,3}/gi, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
-  const prefix = imageStylePrefix || 'anime art style, cel shading, 2D illustration';
-  // Hook images always show the entity if one exists (it's the scariest moment)
-  const entityPart = entityDescription ? entityDescription.slice(0, 120).trim() : '';
+  // Art style only — strip character/monster descriptions so they don't overwhelm the hook scene
+  const rawPrefix = imageStylePrefix || 'anime art style, cel shading, 2D illustration';
+  const styleOnly = filterStyleForScene(rawPrefix, false);
+  const charPart = characterWeightForScene(hook, characterDescription);
+  // Only inject ghost if the hook text explicitly references it — otherwise the scene drives the image
+  const hookMentionsEntity = /\bshe\b|\bit\b|ghost|figure|entity|creature|shadow|apparit/i.test(hook);
+  const entityHint = (hookMentionsEntity && entityDescription)
+    ? entityDescription.split(',').slice(0, 2).join(',').trim()
+    : '';
   const prompt = [
-    prefix,
-    cleanHook.slice(0, 250),
+    cleanHook.slice(0, 300),
     charPart ? `consistent character: ${charPart}` : '',
-    entityPart ? `consistent entity: ${entityPart}` : '',
-    atmosphere,
+    entityHint ? `ghost in background: ${entityHint}` : '',
+    styleOnly,
     'cinematic composition, dramatic lighting, intense cliffhanger moment, masterpiece, highly detailed',
   ].filter(Boolean).join(', ');
 
   console.log(`  Generating hook image...`);
   try {
     if (LOCAL_MODEL_URL) {
-      await retryWithBackoff(() => generateLocalImage(prompt, imageSeed + 9999, outputPath));
+      await retryWithBackoff(() => generateLocalImage(prompt, imageSeed + 54321, outputPath));
     } else {
-      await retryWithBackoff(() => generateHFImage(stylePrompt, hook, [], characterDescription, imageSeed + 9999, outputPath));
+      await retryWithBackoff(() => generateHFImage(prompt, imageSeed + 54321, outputPath));
     }
     console.log(`  ✅ Hook image generated`);
   } catch (err) {
@@ -259,22 +262,26 @@ export async function fetchImagesForPart(
       .replace(/\s{2,}/g, ' ')
       .trim()
       .slice(0, 250);
-    const atmosphere = stylePrompt.trim();
+    const showEntity = scene.show_entity === true;
+    const atmosphere = filterStyleForScene(stylePrompt, showEntity);
     const actionKeywords = scene.keywords.slice(0, 5).join(', ');
     const charPart = characterWeightForScene(scene.description, characterDescription, scene.show_character);
-    const entityPart = (scene.show_entity && entityDescription)
+    const entityPart = (showEntity && entityDescription)
       ? entityDescription.slice(0, 120).trim()
       : '';
-    const stylePrefix = imageStylePrefix || 'anime art style, cel shading, 2D illustration';
+    const rawStylePrefix = imageStylePrefix || 'anime art style, cel shading, 2D illustration';
+    const stylePrefix = filterStyleForScene(rawStylePrefix, showEntity);
     const prompt = [
-      stylePrefix,
       sceneAction,
       actionKeywords,
       charPart ? `consistent character: ${charPart}` : '',
       entityPart ? `consistent entity: ${entityPart}` : '',
+      stylePrefix,
       atmosphere,
       'cinematic composition, rule of thirds, dramatic lighting, masterpiece, highly detailed',
     ].filter(Boolean).join(', ');
+
+    console.log(`    Prompt: ${prompt.slice(0, 200)}...`);
 
     // Generate images — prefer local server, fall back to HuggingFace
     for (let i = 0; i < imagesPerScene; i++) {
@@ -288,12 +295,7 @@ export async function fetchImagesForPart(
         if (LOCAL_MODEL_URL) {
           await retryWithBackoff(() => generateLocalImage(prompt, seed, outPath));
         } else {
-          await retryWithBackoff(() =>
-            generateHFImage(
-              stylePrompt, scene.description, scene.keywords,
-              characterDescription, seed, outPath
-            )
-          );
+          await retryWithBackoff(() => generateHFImage(prompt, seed, outPath));
         }
         localPaths.push(outPath);
         console.log(`    ✅ Image ${i + 1}/${imagesPerScene}`);

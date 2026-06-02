@@ -24,6 +24,7 @@ export interface StoryRecord {
   title: string;
   content: string;
   hook: string;
+  opening_hook?: string;
   thumbnail_title?: string;
   character_description: string;
   entity_description?: string;

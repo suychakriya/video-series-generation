@@ -38,6 +38,7 @@ export async function runAudio(partArg?: number, storyArg?: string): Promise<voi
       title: record.title,
       content: record.content,
       hook: record.hook,
+      opening_hook: record.opening_hook || '',
       thumbnail_title: record.thumbnail_title || '',
       scenes: (record as any).scenes || [],
       facebook_caption: record.facebook_caption,
@@ -60,8 +61,8 @@ export async function runAudio(partArg?: number, storyArg?: string): Promise<voi
       storyId
     );
 
-    // Khmer audio — only if KHMER_TTS_NGROK_URL is configured
-    if (process.env.KHMER_TTS_NGROK_URL) {
+    // Khmer audio — only if KHMER_TTS_NGROK_URL is configured AND translation exists
+    if (process.env.KHMER_TTS_NGROK_URL && storyPart.khmer_title) {
       console.log(`  Generating Khmer audio...`);
       try {
         await generateKhmerAudio(storyPart, theme, record.title, storyId);
@@ -69,7 +70,7 @@ export async function runAudio(partArg?: number, storyArg?: string): Promise<voi
         console.warn(`  Khmer audio failed (non-fatal): ${(err as Error).message}`);
       }
     } else {
-      console.log(`  Skipping Khmer audio (KHMER_TTS_NGROK_URL not set)`);
+      console.log(`  Skipping Khmer audio (${!process.env.KHMER_TTS_NGROK_URL ? 'KHMER_TTS_NGROK_URL not set' : 'no Khmer translation found — run npm run translate first'})`);
     }
 
     await updatePartStatus(record.id, { audio_status: 'done' });

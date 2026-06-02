@@ -10,6 +10,7 @@ import { runSync } from './commands/sync';
 import { runPost } from './commands/post';
 import { runTranslate } from './commands/translate';
 import { runImportStory } from './commands/import-story';
+import { runAnimate } from './commands/animate';
 
 function parsePartArg(args: string[]): number | undefined {
   const idx = args.indexOf('--part');
@@ -55,6 +56,13 @@ async function main(): Promise<void> {
       const part = parsePartArg(args);
       const story = parseStoryArg(args);
       await runImages(part, story);
+      break;
+    }
+
+    case 'animate': {
+      const part = parsePartArg(args);
+      const story = parseStoryArg(args);
+      await runAnimate(part, story);
       break;
     }
 

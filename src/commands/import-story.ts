@@ -63,6 +63,7 @@ export async function runImportStory(jsonPath?: string): Promise<void> {
       title: part.title,
       content: part.content,
       hook: part.hook,
+      opening_hook: part.opening_hook,
       thumbnail_title: part.thumbnail_title,
       character_description: story.character_description,
       entity_description: story.entity_description,

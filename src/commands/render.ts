@@ -62,6 +62,7 @@ function loadAudioPathsForPart(storyId: string, partNum: number, isKhmer = false
     throw new Error(`Audio directory not found: ${audioDir}. Run audio generation first.`);
   }
   const introPath = path.join(audioDir, 'intro.mp3');
+  const openingHookPath = path.join(audioDir, 'opening_hook.mp3');
   const hookPath = path.join(audioDir, 'hook.mp3');
   const outroPath = path.join(audioDir, 'outro.mp3');
   const scenePaths = fs.readdirSync(audioDir)
@@ -72,7 +73,7 @@ function loadAudioPathsForPart(storyId: string, partNum: number, isKhmer = false
       return na - nb;
     })
     .map((f) => path.join(audioDir, f));
-  return { introPath, scenePaths, hookPath, outroPath };
+  return { introPath, openingHookPath, scenePaths, hookPath, outroPath };
 }
 
 export async function runRender(partArg?: number, storyArg?: string): Promise<void> {
@@ -128,6 +129,7 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
       title: record.title,
       content: record.content,
       hook: record.hook,
+      opening_hook: record.opening_hook || '',
       thumbnail_title: record.thumbnail_title || '',
       scenes: (record as any).scenes || [],
       facebook_caption: record.facebook_caption,
@@ -169,14 +171,14 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
     // Render main video (YouTube 1920x1080)
     console.log(`  Rendering main video 1920x1080 (YouTube)...`);
     const mainVideoPath = await renderMainVideo(
-      storyPart, images, audioPaths, theme, storyId, record.title,
+      storyPart, images, audioPaths, theme, storyId, record.youtube_title,
       thumbnailPath, hookImagePath, timings, 'landscape'
     );
 
     // Render Facebook video (1080x1350)
     console.log(`  Rendering Facebook video 1080x1350...`);
     const fbVideoPath = await renderMainVideo(
-      storyPart, images, audioPaths, theme, storyId, record.title,
+      storyPart, images, audioPaths, theme, storyId, record.youtube_title,
       thumbnailPath, hookImagePath, timings, 'facebook'
     );
 
@@ -198,7 +200,7 @@ export async function runRender(partArg?: number, storyArg?: string): Promise<vo
             narration: s.khmer_narration || s.narration,
           })),
         };
-        const khmerTitle = (record as any).khmer_title || record.title;
+        const khmerTitle = (record as any).khmer_title || record.youtube_title;
         khmerFbVideoPath = await renderMainVideo(
           khmerStoryPart, images, khmerAudioPaths, theme, storyId, khmerTitle,
           thumbnailPath, hookImagePath, khmerTimings, 'facebook', '_khmer'

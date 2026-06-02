@@ -78,10 +78,12 @@ export async function renderMainVideo(
   const outputPath = path.join(outputDir, `${baseName}${outputSuffix}.mp4`);
 
   const fps = 30;
+  const isLastPart = part.part === 4;
   const totalDurationSec =
+    timings.openingHookDurationSec +
     timings.introDurationSec +
     timings.sceneDurationsSec.reduce((a, b) => a + b, 0) +
-    timings.hookDurationSec +
+    (isLastPart ? 0 : timings.hookDurationSec) +
     timings.outroDurationSec;
   const durationInFrames = Math.ceil(totalDurationSec * fps) + fps; // +1s buffer
   const serveUrl = await getServeUrl();
@@ -96,6 +98,7 @@ export async function renderMainVideo(
   }));
 
   // --- Exact clip timings from real audio durations ---
+  const openingHookFrames = Math.round(timings.openingHookDurationSec * fps);
   const introFrames = Math.round(timings.introDurationSec * fps);
   const hookFrames = Math.round(timings.hookDurationSec * fps);
   const outroFrames = Math.round(timings.outroDurationSec * fps);
@@ -104,17 +107,18 @@ export async function renderMainVideo(
   const clipTimings: Array<{ startFrame: number; durationFrames: number }> = [];
 
   if (format === 'facebook') {
-    // Facebook visual order: hookImage → thumbnail → scenes → hookImage (hook) → hookImage (outro)
-    // Each clip gets its own independent audio file — no seeking needed.
-    clips.push({ src: toDataUri(hookImagePath), isVideo: false }); // [0] hook tease
+    // Facebook: openingHook → thumbnail → scenes → endingHook (Parts 1-3) → outro
+    clips.push({ src: toDataUri(hookImagePath), isVideo: false }); // [0] opening hook
     clips.push({ src: toDataUri(thumbnailPath), isVideo: false }); // [1] intro
     imageResults.forEach((r) => clips.push({ src: toDataUri(r.localPath), isVideo: false }));
-    clips.push({ src: toDataUri(hookImagePath), isVideo: false }); // [last-1] second hook
-    clips.push({ src: toDataUri(hookImagePath), isVideo: false }); // [last] outro CTA
+    if (!isLastPart) {
+      clips.push({ src: toDataUri(hookImagePath), isVideo: false }); // ending hook (Parts 1-3)
+    }
+    clips.push({ src: toDataUri(hookImagePath), isVideo: false }); // outro CTA
 
     // Visual timings
-    clipTimings.push({ startFrame: 0, durationFrames: hookFrames });
-    clipTimings.push({ startFrame: hookFrames, durationFrames: introFrames });
+    clipTimings.push({ startFrame: 0, durationFrames: openingHookFrames });
+    clipTimings.push({ startFrame: openingHookFrames, durationFrames: introFrames });
     let sceneVisualOffset = 0;
     for (let i = 0; i < part.scenes.length; i++) {
       const durationFrames =
@@ -123,27 +127,32 @@ export async function renderMainVideo(
           : Math.round(timings.sceneDurationsSec.reduce((a, b) => a + b, 0) * fps) -
             sceneVisualOffset;
       clipTimings.push({
-        startFrame: hookFrames + introFrames + sceneVisualOffset,
+        startFrame: openingHookFrames + introFrames + sceneVisualOffset,
         durationFrames,
       });
       sceneVisualOffset += durationFrames;
     }
-    const secondHookStart = hookFrames + introFrames + sceneVisualOffset;
-    clipTimings.push({ startFrame: secondHookStart, durationFrames: hookFrames }); // second hook
-    clipTimings.push({ startFrame: secondHookStart + hookFrames, durationFrames: outroFrames }); // outro
+    const afterScenesStart = openingHookFrames + introFrames + sceneVisualOffset;
+    if (!isLastPart) {
+      clipTimings.push({ startFrame: afterScenesStart, durationFrames: hookFrames });
+      clipTimings.push({ startFrame: afterScenesStart + hookFrames, durationFrames: outroFrames });
+    } else {
+      clipTimings.push({ startFrame: afterScenesStart, durationFrames: outroFrames });
+    }
 
-    // Per-clip audio srcs in visual order: hook → intro → scenes → hook → outro
+    // Per-clip audio: openingHook → intro → scenes → endingHook (Parts 1-3) → outro
     const audioSrcs = [
-      toAudioDataUri(audioPaths.hookPath),
+      toAudioDataUri(audioPaths.openingHookPath),
       toAudioDataUri(audioPaths.introPath),
       ...audioPaths.scenePaths.map(toAudioDataUri),
-      toAudioDataUri(audioPaths.hookPath),
+      ...(!isLastPart ? [toAudioDataUri(audioPaths.hookPath)] : []),
       toAudioDataUri(audioPaths.outroPath),
     ];
 
     const totalSceneFrames = Math.round(timings.sceneDurationsSec.reduce((a, b) => a + b, 0) * fps);
-    const fbDurationInFrames =
-      hookFrames + introFrames + totalSceneFrames + hookFrames + outroFrames + fps;
+    const fbDurationInFrames = isLastPart
+      ? openingHookFrames + introFrames + totalSceneFrames + outroFrames + fps
+      : openingHookFrames + introFrames + totalSceneFrames + hookFrames + outroFrames + fps;
 
     const fbInputProps: FacebookVideoProps = {
       clips,
@@ -155,6 +164,8 @@ export async function renderMainVideo(
       theme: themeForVideo,
       storyTitle,
       hook: part.hook,
+      openingHook: part.opening_hook,
+      isLastPart,
     };
     const composition = await selectComposition({
       serveUrl,
@@ -178,30 +189,40 @@ export async function renderMainVideo(
     return outputPath;
   }
 
-  // Landscape: thumbnail → scenes → hookImage → hookImage (outro)
-  clips.push({ src: toDataUri(thumbnailPath), isVideo: false }); // [0] intro
+  // Landscape: openingHook → thumbnail → scenes → endingHook (Parts 1-3) → outro
+  clips.push({ src: toDataUri(hookImagePath), isVideo: false }); // [0] opening hook
+  clips.push({ src: toDataUri(thumbnailPath), isVideo: false }); // [1] intro
   imageResults.forEach((r) => clips.push({ src: toDataUri(r.localPath), isVideo: false }));
-  clips.push({ src: toDataUri(hookImagePath), isVideo: false }); // [last-1] hook
-  clips.push({ src: toDataUri(hookImagePath), isVideo: false }); // [last] outro
+  if (!isLastPart) {
+    clips.push({ src: toDataUri(hookImagePath), isVideo: false }); // ending hook (Parts 1-3)
+  }
+  clips.push({ src: toDataUri(hookImagePath), isVideo: false }); // outro
 
-  clipTimings.push({ startFrame: 0, durationFrames: introFrames });
+  clipTimings.push({ startFrame: 0, durationFrames: openingHookFrames });
+  clipTimings.push({ startFrame: openingHookFrames, durationFrames: introFrames });
   let offset = 0;
   for (let i = 0; i < part.scenes.length; i++) {
     const durationFrames =
       i < part.scenes.length - 1
         ? Math.round(timings.sceneDurationsSec[i] * fps)
         : Math.round(timings.sceneDurationsSec.reduce((a, b) => a + b, 0) * fps) - offset;
-    clipTimings.push({ startFrame: introFrames + offset, durationFrames });
+    clipTimings.push({ startFrame: openingHookFrames + introFrames + offset, durationFrames });
     offset += durationFrames;
   }
-  clipTimings.push({ startFrame: introFrames + offset, durationFrames: hookFrames });
-  clipTimings.push({ startFrame: introFrames + offset + hookFrames, durationFrames: outroFrames });
+  const afterScenes = openingHookFrames + introFrames + offset;
+  if (!isLastPart) {
+    clipTimings.push({ startFrame: afterScenes, durationFrames: hookFrames });
+    clipTimings.push({ startFrame: afterScenes + hookFrames, durationFrames: outroFrames });
+  } else {
+    clipTimings.push({ startFrame: afterScenes, durationFrames: outroFrames });
+  }
 
-  // Per-clip audio srcs in visual order: intro → scenes → hook → outro
+  // Per-clip audio: openingHook → intro → scenes → endingHook (Parts 1-3) → outro
   const audioSrcs = [
+    toAudioDataUri(audioPaths.openingHookPath),
     toAudioDataUri(audioPaths.introPath),
     ...audioPaths.scenePaths.map(toAudioDataUri),
-    toAudioDataUri(audioPaths.hookPath),
+    ...(!isLastPart ? [toAudioDataUri(audioPaths.hookPath)] : []),
     toAudioDataUri(audioPaths.outroPath),
   ];
 
@@ -216,6 +237,8 @@ export async function renderMainVideo(
     theme: themeForVideo,
     storyTitle,
     hook: part.hook,
+    openingHook: part.opening_hook,
+    isLastPart,
   };
 
   const composition = await selectComposition({ serveUrl, id: 'MainVideo', inputProps });

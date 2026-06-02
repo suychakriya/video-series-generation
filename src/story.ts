@@ -5,12 +5,12 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export interface Scene {
   scene_number: number;
-  narration: string;  // the exact story text spoken while this scene's image is shown
+  narration: string; // the exact story text spoken while this scene's image is shown
   khmer_narration?: string; // Khmer translation of the narration
   description: string;
   keywords: string[];
   show_character: boolean; // true = character is the main subject; false = focus on environment/object
-  show_entity?: boolean;   // true = the ghost/entity/monster is visually present in this scene
+  show_entity?: boolean; // true = the ghost/entity/monster is visually present in this scene
 }
 
 export interface StoryPart {
@@ -18,13 +18,14 @@ export interface StoryPart {
   title: string;
   content: string;
   hook: string;
+  opening_hook: string;
   thumbnail_title: string;
   scenes: Scene[];
   facebook_caption: string;
   youtube_title: string;
   youtube_description_hook: string;
-  khmer_title?: string;         // Khmer translation of the story title
-  khmer_hook?: string;          // Khmer translation of the hook
+  khmer_title?: string; // Khmer translation of the story title
+  khmer_hook?: string; // Khmer translation of the hook
   khmer_facebook_caption?: string; // Khmer Facebook caption
 }
 
@@ -85,11 +86,12 @@ STORY VARIATION DIRECTIVE — you MUST build this story around ALL THREE of thes
 Do not substitute or ignore any of these. The setting, protagonist background, and core premise must be the foundation of the story from the very first sentence.`;
   }
 
-  const avoidBlock = recentTitles.length > 0
-    ? `\nRECENTLY GENERATED STORIES FOR THIS THEME — do NOT write a story similar to any of these:
+  const avoidBlock =
+    recentTitles.length > 0
+      ? `\nRECENTLY GENERATED STORIES FOR THIS THEME — do NOT write a story similar to any of these:
 ${recentTitles.map((t) => `- "${t}"`).join('\n')}
 `
-    : '';
+      : '';
 
   const prompt = `You are a master storyteller for "Untold Lores", a viral social media channel.
 
@@ -122,12 +124,12 @@ REQUIREMENTS:
   Latin American, etc. Match the name to the story's setting and atmosphere, not the visual style.
   The visual style (anime art) is for images only — it does not dictate the story's culture.
 - Each part: 800-1000 words
-- Each part has as many scenes as the story naturally requires (min 20, max 60).
-  Each scene covers ONE short sentence only — maximum 25 words per narration.
-  This keeps every scene's audio under 10 seconds. If a sentence exceeds 25 words,
-  split it naturally across two scenes. Break the story into scenes at every sentence —
-  one sentence per scene is the default. Never combine two sentences into one scene.
-  More scenes = better image-to-voice sync. Always err toward more scenes, never fewer.
+- Each part MUST have between 20 and 40 scenes — this is a hard limit, never exceed 40.
+  Each scene covers one or two short sentences. Target one sentence per scene, but group
+  2 short sentences together when needed to stay within 40 scenes total.
+  Each scene's narration must be under 30 words. If a single sentence exceeds 30 words,
+  split it naturally across two scenes.
+  Never skip or duplicate any sentence from the content.
 - CRITICAL: Every sentence of the content MUST appear in exactly one scene's narration.
   The narration fields across all scenes, concatenated in order, must equal the full content
   word-for-word. No sentence may be skipped or duplicated.
@@ -154,7 +156,13 @@ REQUIREMENTS:
   Good: "he clenches his jaw, fists shaking at his sides, eyes locked on the figure ahead".
 - Each scene has vivid visual keywords focused on the key action, emotion, and atmosphere
   (not just the setting — include the character's state and the dramatic tension)
-- Cliffhanger hook at end of each part (1-2 sentences, ultra dramatic)
+- All parts: opening_hook — tease the single most dramatic, shocking, or emotional moment INSIDE
+  that part (1-2 sentences, ultra dramatic, makes the viewer need to watch to find out how it
+  happens). Shown at the START of the video before anything else.
+- Parts 1–3: hook — cliffhanger at the END (1-2 sentences, ultra dramatic, leaves viewer desperate
+  for the next part). Shown at the END of the video.
+- Part 4 (final part): hook must be an empty string "" — story ends with a satisfying conclusion,
+  no cliffhanger.
 - thumbnail_title: 3-5 words MAX, clickbait, NO punctuation
   Examples: "She Knew Too Much", "He Was Already Dead", "Nobody Believed Her"
 - Facebook caption: 150-200 words, emotional, ends with question + hashtags
@@ -173,7 +181,8 @@ Respond with ONLY valid JSON in this exact format:
       "part": 1,
       "title": "string",
       "content": "string (800-1000 words)",
-      "hook": "string (cliffhanger ending, 1-2 sentences)",
+      "hook": "string (Parts 1-3: cliffhanger ending, 1-2 sentences. Part 4: empty string \"\")",
+      "opening_hook": "string (all parts: tease the most dramatic moment inside this part, 1-2 sentences)",
       "thumbnail_title": "string (3-5 words, no punctuation)",
       "scenes": [
         {

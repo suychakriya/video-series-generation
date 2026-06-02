@@ -27,6 +27,8 @@ const RemotionRoot: React.FC = () => {
           theme: { colorTint: 'rgba(0,0,0,0.2)', name: 'Horror' },
           storyTitle: '',
           hook: '',
+          openingHook: '',
+          isLastPart: false,
         }}
       />
       <Composition
@@ -61,6 +63,8 @@ const RemotionRoot: React.FC = () => {
           theme: { colorTint: 'rgba(0,0,0,0.2)', name: 'Horror' },
           storyTitle: '',
           hook: '',
+          openingHook: '',
+          isLastPart: false,
         }}
       />
       <Composition

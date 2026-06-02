@@ -96,6 +96,32 @@ export const THEMES: Theme[] = [
       'He had been receiving voicemails from his dead father for three weeks.',
       'The new neighbor introduced himself. He recognized him immediately — from his nightmares.',
     ],
+    storyInstructions: `Write a horror and suspense story that keeps the reader desperate to know what happens next. Every sentence must pull them forward.
+
+WRITING STYLE — MANDATORY:
+- Short, tight sentences. Cut every word that doesn't earn its place.
+- No long scenery or setting descriptions. One sentence of context, then immediately into the tension.
+- Every paragraph must end with the reader wanting to know what comes next — a question, a threat, an unanswered detail.
+- Suspense comes from what is HIDDEN. Reveal just enough. Withhold just enough. Never explain everything at once.
+- Write paranoia from inside the protagonist's head: what he notices, what he dismisses, what he realizes too late he should not have dismissed.
+- The most effective horror is a normal detail that is slightly wrong. A door open that was closed. A name the stranger should not know. A face that is almost right.
+
+STRUCTURE — MANDATORY PER PART:
+- Part 1: establish normal, then crack it. By the end of Part 1 the reader knows something is deeply wrong and the protagonist does not yet understand what. End the moment the protagonist realizes the threat is real.
+- Part 2: the protagonist starts investigating or running — and discovers the threat is bigger, closer, or more personal than he thought. A second twist that reframes Part 1. End at his most vulnerable moment.
+- Part 3: the full shape of the danger is revealed. A major twist that changes everything. The protagonist is trapped — no obvious exit, no safe person, no time. End at the point of no return.
+- Part 4: the confrontation and aftermath. The resolution must cost something. Not a clean escape — a price paid. End with a detail that lingers, something the reader will keep thinking about.
+
+TENSION RULES:
+- The reader must always know slightly more than the protagonist — dramatic irony creates dread.
+- Every scene must raise one new question while answering at most one old one.
+- No relief. Any moment that feels like safety must be immediately revealed as false.
+- The threat must be specific, personal, and intelligent — not random violence but something that has chosen this person for a reason.
+
+BANNED:
+- No long descriptions of locations, weather, or backstory in opening paragraphs.
+- No neutral scenes where nothing is at stake.
+- No "he felt uneasy" — describe what his body does, what he notices, what he cannot stop thinking about.`,
   },
   // {
   //   id: 'drama_betrayal',
@@ -209,7 +235,7 @@ Choose a case with rich documentation so the 4-part structure can be filled with
     leadIn: "I don't know how to explain what I saw...",
     themeLabel: 'GHOST STORY',
     themeEmoji: '💀',
-    imageStylePrefix: 'horror anime art style, cel shading, 2D illustration, pale female ghost with blood streaming down her cracked decomposing face, hollow sunken black eye sockets, dark veins visible under translucent rotting skin, blood splatter on walls, pitch black suffocating darkness, victim frozen in absolute terror, wide white horror-struck eyes, grotesque supernatural entity emerging from shadow',
+    imageStylePrefix: 'horror anime art style, cel shading, 2D illustration, Japanese onryou ghost with long straight black hair covering half the face, pale skull-like grey face with hollow black eye sockets, multiple white ghost masks floating in dark background, pitch black suffocating darkness, traditional Japanese interior, victim frozen in absolute terror, wide horror-struck eyes, supernatural entity emerging from deep shadow, Juon Ring style, highly detailed, masterpiece',
     storySeeds: {
       settings: [
         '1970s apartment block in Hong Kong — narrow corridors, paper-thin walls, twelfth floor, lift that stops on its own',
@@ -254,21 +280,31 @@ Choose a case with rich documentation so the 4-part structure can be filled with
         'whatever haunts this place has followed the same family across generations and has just found the next one',
       ],
     },
-    storyInstructions: `Write a genuinely terrifying ghost story. This is not atmosphere — it is fear.
+    storyInstructions: `Write a ghost story that makes the reader feel genuinely afraid. Not literary. Not atmospheric. SCARY.
 
-The ghost or entity MUST be physically described in visceral, specific detail: its face, its hands, the way it moves, the sounds it makes, what the air feels like when it is near. Not "a dark shape" — specific horrible detail.
+WRITING STYLE — MANDATORY:
+- Short sentences at horror moments. Never more than 10 words when something wrong is happening.
+- The protagonist narrates in first person. The reader must feel it happening to them.
+- ZERO long scenery paragraphs. One sentence of setting maximum, then immediately into the fear.
+- Every paragraph must contain something that makes the reader uncomfortable. No neutral filler.
+- Write what the body does under extreme fear: hands won't move, breath stops, legs lock, vision tunnels.
+- The most terrifying details must be small and specific: a finger bending the wrong way, breath on the back of a neck, a name whispered from inside a wall.
 
-The protagonist MUST come face to face with it. Not a glimpse. Not a feeling. A direct confrontation where they can see it clearly and cannot escape.
+HORROR BEATS — EVERY PART MUST CONTAIN:
+- Part 1: something physically wrong that cannot be explained. A sound. A shape. Evidence of presence. End the part the instant the protagonist realizes they are not alone.
+- Part 2: the entity does something deliberate. It moves toward them. It touches something. It knows their name. The protagonist cannot leave. End at the moment they understand what it wants.
+- Part 3: direct confrontation. The protagonist sees it fully. Describe EXACTLY what it looks like, what it smells like, what the air feels like. They cannot escape. End at their worst moment.
+- Part 4: the horror is not over. Something has changed permanently. The entity has done something to them or taken something. End with a detail that means it is still happening.
 
-Include at least one scene where the protagonist is alone in complete darkness with the entity very close, and they cannot run.
+THE ENTITY MUST:
+- Be physically specific: exact face, exact hands, exact sound, exact movement. Never "a dark shape."
+- Do something that violates a physical rule: turns its head before its body, moves without its feet touching the floor, speaks in a voice the protagonist recognizes.
+- Want something specific from this person — not random haunting but targeted, personal, inevitable.
 
-Each part must escalate the dread. By Part 2 the reader should be uncomfortable. By Part 3 they should be afraid. By Part 4 they should be genuinely disturbed.
-
-The horror must be INESCAPABLE — not "I moved and it was fine" but something that follows, that waits, that wants something specific from this person.
-
-Write the physical experience of terror: the protagonist's body shaking, the cold that spreads from the corner, the sound that should not exist, the moment the entity's head turns slowly toward them in the dark.
-
-End each part at the worst possible moment — the moment of maximum horror, not a quiet reframe. The audience must not be able to stop reading.`,
+BANNED CONTENT:
+- No long descriptions of buildings, weather, roads, or history in Part 1. Get to the horror by paragraph 3.
+- No "I felt uneasy" or "something felt wrong" — describe the physical sensation specifically.
+- No safety. No relief. No moment where the protagonist feels better. Dread accumulates, never resets.`,
     exampleOpenings: [
       'My mother told me never to open the basement door. One night I heard something down there — soft, whimpering, almost like a puppy. I was six years old and I wanted to see it so badly. I crept down a few steps in the dark. There was no puppy. My mother yanked me back so hard I fell, and she held me against her chest and would not stop shaking. She never yelled. Not once in my life had she ever raised her voice at me. She yelled that night. Later she gave me a warm cookie and stroked my hair until I stopped crying, and she told me very quietly never to go down there again. I did not ask her why the boy in the corner had been moving like that, or why he had no hands or feet, or why he had looked up at me and smiled.',
       'When my sister and I were children, our family rented an old farmhouse for two summers. We loved everything about it — the creaking floors, the apple tree, the way fog sat in the fields at dawn. But our favorite thing was the ghost. We called her Mother, because she felt like one. Some mornings we would wake to find a cup of warm milk on each of our nightstands that had not been there when we fell asleep. Mother worried we would get thirsty in the night. In the living room there was an antique chair kept against the back wall. Whenever we sat watching television or playing cards, the chair would inch slowly forward across the room toward us, moving when we were not looking directly at it. Sometimes we would turn around and find it had crossed the whole room. We always felt a little guilty pushing it back. Mother only wanted to be near us. Years later I found a newspaper archive about the farmhouse. The original owner was a widow who had lived alone after her children died. She had given them each a cup of poisoned milk in the night, then hanged herself from a beam in the living room. The photograph that ran in the paper showed the living room. Her body. And below her feet, placed exactly in the center of the room, was the chair.',
@@ -338,6 +374,33 @@ End each part at the worst possible moment — the moment of maximum horror, not
       'He was the last dragon hunter. Until the day he discovered he was half dragon.',
       'Magic had been forbidden for a century. He had been using it his whole life without knowing.',
     ],
+    storyInstructions: `Write a dark fantasy story that grips the reader from the first sentence and never lets go. Suspense and intrigue — not world-building.
+
+WRITING STYLE — MANDATORY:
+- No long descriptions of kingdoms, landscapes, magic systems, or history. One sentence of context, then into the story.
+- Every paragraph must end with the reader needing to know what comes next — a threat, a secret half-revealed, a decision with no good options.
+- Short, sharp sentences when stakes are high. Long sentences are earned only in quiet moments — and there are few quiet moments.
+- The world reveals itself through what characters DO and FEAR, not through exposition.
+- Secrets and deception drive every scene. Who is lying? What does someone want that they are not saying? What is being hidden and why?
+- The most powerful moments are small: a word chosen carefully, a door that should be locked but isn't, a face that goes still when a name is mentioned.
+
+STRUCTURE — MANDATORY PER PART:
+- Part 1: drop the reader into a situation already in motion. Establish the protagonist's specific problem — not the world's problem, his problem. End the moment he discovers the threat is bigger or more personal than he thought.
+- Part 2: the protagonist pursues a solution and finds it makes things worse, or discovers an ally is not what they seem. A twist that reframes Part 1 completely. End at his most exposed moment.
+- Part 3: the full truth is revealed — about the world, the enemy, or the protagonist himself. It changes everything. He is now trapped between two impossible choices. End at the point of no return.
+- Part 4: the confrontation. The resolution must cost something real. Power, a person, a belief. Not a clean victory — a hard-won survival with consequences that last.
+
+TENSION RULES:
+- Every scene must raise one new question while answering at most one old one. Information is currency — spend it carefully.
+- The antagonist must be intelligent, have a coherent reason for what they want, and be at least partially right.
+- No scene where nothing is at stake. Even a conversation must have a hidden risk or a concealed agenda.
+- The magic or supernatural element must have a cost, a limit, or a danger — power without price creates no tension.
+
+BANNED:
+- No opening paragraphs describing the geography, history, or politics of the world.
+- No neutral scenes, no tavern exposition, no training montages.
+- No "chosen one" framing unless the story immediately subverts it.
+- No "he felt a sense of wonder" — show what he sees and does, not what he feels abstractly.`,
   },
 ];
 

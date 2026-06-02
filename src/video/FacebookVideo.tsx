@@ -19,6 +19,8 @@ export interface FacebookVideoProps {
   theme: { colorTint: string; name: string };
   storyTitle: string;
   hook: string;
+  openingHook: string;
+  isLastPart: boolean;
 }
 
 const cinzel: React.CSSProperties = { fontFamily: "'Cinzel', serif" };
@@ -59,6 +61,8 @@ export const FacebookVideo: React.FC<FacebookVideoProps> = ({
   theme,
   storyTitle,
   hook,
+  openingHook,
+  isLastPart,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -76,8 +80,10 @@ export const FacebookVideo: React.FC<FacebookVideoProps> = ({
   const frameInClip = currentClipTiming ? Math.max(0, frame - currentClipTiming.startFrame) : 0;
   const currentClipDuration = currentClipTiming?.durationFrames ?? fps * 10;
 
-  // clips order: hookImage(0), thumbnail(1), ...scenes..., hookImage(last-1), hookImage(last=outro)
-  const isHookClip = currentImageIndex === 0 || currentImageIndex === clips.length - 2;
+  // clips order: openingHook(0), thumbnail(1), ...scenes..., endingHook(last-1, Parts 1-3), outro(last)
+  const isOpeningHookClip = currentImageIndex === 0;
+  const isEndingHookClip = !isLastPart && currentImageIndex === clips.length - 2;
+  const isHookClip = isOpeningHookClip || isEndingHookClip;
   const isOutroClip = currentImageIndex === clips.length - 1;
 
   const sceneCaption = React.useMemo(() => {
@@ -127,7 +133,7 @@ export const FacebookVideo: React.FC<FacebookVideoProps> = ({
                   src={clip.src}
                   index={i}
                   duration={durationFrames}
-                  isHook={i === 0 || i === clips.length - 2 || i === clips.length - 1}
+                  isHook={i === 0 || (!isLastPart && i === clips.length - 2) || i === clips.length - 1}
                 />
               </Sequence>
             </div>
@@ -195,7 +201,7 @@ export const FacebookVideo: React.FC<FacebookVideoProps> = ({
           </p>
         )}
 
-        {/* Hook */}
+        {/* Hook text — opening hook at start, ending cliffhanger at end */}
         {isHookClip && (
           <p
             className="text-center leading-normal m-0 font-bold"
@@ -206,7 +212,7 @@ export const FacebookVideo: React.FC<FacebookVideoProps> = ({
               textShadow: '0 2px 12px rgba(0,0,0,1)',
             }}
           >
-            {hook}
+            {isOpeningHookClip ? openingHook : hook}
           </p>
         )}
 
