@@ -145,7 +145,7 @@ export async function renderMainVideo(
       toAudioDataUri(audioPaths.openingHookPath),
       toAudioDataUri(audioPaths.introPath),
       ...audioPaths.scenePaths.map(toAudioDataUri),
-      ...(!isLastPart ? [toAudioDataUri(audioPaths.hookPath)] : []),
+      ...(!isLastPart && fs.existsSync(audioPaths.hookPath) ? [toAudioDataUri(audioPaths.hookPath)] : []),
       toAudioDataUri(audioPaths.outroPath),
     ];
 
