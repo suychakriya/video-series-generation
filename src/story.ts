@@ -11,6 +11,8 @@ export interface Scene {
   keywords: string[];
   show_character: boolean; // true = character is the main subject; false = focus on environment/object
   show_entity?: boolean; // true = the ghost/entity/monster is visually present in this scene
+  show_second_character?: boolean; // true = a second person (supervisor, stranger, etc.) is visually present alongside the protagonist
+  secondary_character_description?: string; // physical description of that second person, only set when show_second_character is true
 }
 
 export interface StoryPart {
@@ -136,6 +138,15 @@ REQUIREMENTS:
 - Each scene's description MUST capture the single most dramatic, visually striking moment
   of that scene — the peak action, emotional climax, or pivotal reveal. Be cinematic and specific:
   WHO is doing WHAT, their exact expression/posture/action, and what surrounds them.
+- CRITICAL — style_prompt is appended to EVERY scene's image prompt, including scenes set in
+  completely different locations (an office, a kitchen, a bathroom, a street). It must ONLY contain
+  reusable, transferable mood modifiers: art style, color grading, lighting quality/mood, shadow
+  density, general texture/decay. NEVER include a concrete one-time set piece — no specific window,
+  candle, moon, doorway, or piece of furniture — because that exact object will visually appear in
+  every scene regardless of whether it belongs there.
+  Bad: "cold blue-white moonlight slicing through shattered industrial windows" (stamps a window
+  and moonlight onto indoor office/kitchen/bathroom scenes that have neither).
+  Good: "cold blue-white color grading, deep chiaroscuro lighting, heavy shadow density".
 - For each scene, set show_character: true if the character's face/body is the main visual focus.
   Set show_character: false when the scene is better shown as: an environment (empty room, forest,
   city street), an object (a letter, a weapon, a door), a crowd shot, a wide establishing shot,
@@ -145,6 +156,21 @@ REQUIREMENTS:
   present and should appear in the image. Set show_entity: false for scenes where the entity is
   not visible (protagonist alone, environment only, objects, flashbacks without the entity).
   Only applies when entity_description is not null.
+- For each scene, set show_second_character: true if a second human person — anyone other than
+  the protagonist (a supervisor, stranger, relative, guard, coworker, etc.) — is visually present
+  in the scene alongside or instead of the protagonist. Set false when only the protagonist (or no
+  one) is on screen. This drives whether the image generator draws one person or two, so set it
+  accurately even when the second person is only implied by dialogue or a brief mention.
+  Whenever show_second_character is true, ALSO set secondary_character_description: a short
+  physical description (age, build, notable features, clothing) of that specific person — the
+  image generator has no other way to know what they look like and will render them as a bare
+  hand/arm without one.
+  - Many secondary characters only appear in a single scene (a stranger, a guard, a passerby) —
+    that's fine, just describe them for that one scene.
+  - If the SAME secondary character reappears across multiple scenes (e.g. "the father",
+    "the supervisor"), reuse the identical description text in every scene they appear in, so the
+    image generator renders them consistently across the story, the same way character_description
+    keeps the protagonist consistent.
 - CRITICAL — descriptions are sent DIRECTLY to an image generator that takes every word LITERALLY:
   - NO metaphors, similes, or figurative language. If the narration says "she moved like a wave",
     the description must NOT say "wave" — say what the character is literally doing instead.
@@ -154,6 +180,16 @@ REQUIREMENTS:
   Bad: "his anger burned like fire" → image generator draws fire.
   Good: "she spins gracefully across the stone floor, arms outstretched, silk robes billowing".
   Good: "he clenches his jaw, fists shaking at his sides, eyes locked on the figure ahead".
+- CRITICAL — NEVER describe close-ups of documents, books, notebooks, letters, screens, or any
+  object that contains text. The image generator will hallucinate garbled text and ruin the image.
+  When a scene involves a character reading something, describe their FACE and REACTION instead,
+  or show them holding the object from a distance where no text is legible.
+  Bad: "close-up of an open notebook showing handwritten log entries"
+  Bad: "laptop screen displaying a spreadsheet with names in rows"
+  Bad: "letter held up revealing typed text"
+  Good: "young man hunched over a desk, eyes scanning downward, expression tightening with dread"
+  Good: "man holding a folded letter at arm's length, face pale, hand trembling slightly"
+  Good: "wide shot of character at desk, laptop open in front of him, face illuminated by the glow"
 - Each scene has vivid visual keywords focused on the key action, emotion, and atmosphere
   (not just the setting — include the character's state and the dramatic tension)
 - All parts: opening_hook — tease the single most dramatic, shocking, or emotional moment INSIDE
@@ -172,9 +208,9 @@ REQUIREMENTS:
 Respond with ONLY valid JSON in this exact format:
 {
   "overall_title": "string",
-  "character_description": "string (highly specific physical description for image consistency — MUST include: unique face feature like scar/unusual eyes/jaw shape, exact hair style and color, specific clothing with color, approximate age, skin tone, build. Example: 'young man mid-20s, lean build, olive skin, sharp angular jaw, short messy dark brown hair with a streak of grey, deep-set amber eyes, wearing a worn dark teal jacket over a grey tunic, small scar above left eyebrow')",
-  "entity_description": "string or null (ONLY for stories with a ghost, monster, or recurring supernatural entity — describe its exact appearance in the same specific detail as character_description: skin color/texture, eye appearance, clothing or lack thereof, distinguishing features, how it moves. Example: 'tall female ghost, translucent pale grey rotting skin, black hollow eye sockets with thin red veins at the edges, cracked lips pulled back revealing grey teeth, long black matted hair partially covering her face, wearing a torn white burial dress stained dark at the hem, moves with a slow jerking motion as if her spine is broken'. Set to null if there is no recurring entity.)",
-  "style_prompt": "string (specific visual style for this story)",
+  "character_description": "string (highly specific physical description for image consistency — the character MUST look like a bishounen manhwa/webtoon protagonist: pale porcelain white skin, messy dark hair with individual strands, sharp defined features, tall lean build, handsome East Asian face. MUST include: unique face feature like scar/sharp eyes/strong jaw, exact hair style and color, specific clothing with color, approximate age. Example: 'young man mid-20s, tall lean build, pale porcelain skin, sharp angular jaw with high cheekbones, messy dark black hair falling over forehead, deep dark intense eyes, wearing a dark navy high-collar coat, thin scar across the bridge of his nose')",
+  "entity_description": "string or null (ONLY for stories with a ghost, monster, or recurring supernatural entity — describe its exact appearance in the same specific detail as character_description: skin color/texture, eye appearance, hair style/color or lack thereof, clothing or lack thereof, hand/finger appearance, distinguishing features, how it moves. Example: 'tall female ghost, translucent pale grey rotting skin, black hollow eye sockets with thin red veins at the edges, cracked lips pulled back revealing grey teeth, long black matted hair partially covering her face, wearing a torn white burial dress stained dark at the hem, moves with a slow jerking motion as if her spine is broken'. Set to null if there is no recurring entity.)",
+  "style_prompt": "string (reusable mood modifiers ONLY — art style, color grading, lighting quality, shadow density, decay texture. NO concrete one-time set pieces like a specific window, candle, moon, or doorway — this string is appended to every scene regardless of location. Example: 'horror anime art style, cold blue-white color grading, deep chiaroscuro lighting, heavy shadow density, decayed brutalist texture')",
   "image_seed": number (random integer 1000-9999),
   "parts": [
     {
@@ -191,7 +227,9 @@ Respond with ONLY valid JSON in this exact format:
           "description": "string (cinematic peak moment for image generation — literal visuals only, no metaphors)",
           "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
           "show_character": true,
-          "show_entity": false
+          "show_entity": false,
+          "show_second_character": false,
+          "secondary_character_description": "string or omit (only when show_second_character is true — physical description of that specific person; reuse the same text across scenes if it's the same recurring person)"
         }
       ],
       "facebook_caption": "string",

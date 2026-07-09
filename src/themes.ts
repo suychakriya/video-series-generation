@@ -36,7 +36,7 @@ export const THEMES: Theme[] = [
     id: 'horror_thriller',
     name: 'Horror & Thriller',
     stylePrompt:
-      'horror anime art style, dark terrifying atmosphere, blood splatter, deep shadows, eerie fog, ghostly apparitions, moonlit darkness, pale frightened faces, 2D illustration, cel shading, dramatic horror lighting, ominous background, 8k, highly detailed',
+      'Japanese horror anime illustration style, dark terrifying atmosphere, blood splatter, deep shadows, eerie fog, ghostly apparitions, moonlit darkness, pale frightened faces, dramatic horror lighting, ominous background, 8k, highly detailed',
     voiceTone: 'slow and suspenseful, whispering tone, dramatic pauses',
     facebookHashtags: '#horror #thriller #scarystory #horrorstory #scary #storytime #UntoldLores',
     youtubeTags:
@@ -52,7 +52,7 @@ export const THEMES: Theme[] = [
     leadIn: 'And then... he realized...',
     themeLabel: 'HORROR',
     themeEmoji: '🔴',
-    imageStylePrefix: 'horror anime art style, cel shading, 2D illustration, dark terrifying atmosphere, blood splatter, pale terrified faces, grotesque monsters, pitch black shadows, visceral horror',
+    imageStylePrefix: 'manhwa webtoon illustration style, Solo Leveling art style, bishounen handsome East Asian male, pale porcelain white skin, messy dark hair with individual strands, soft gradient shading, clean digital art, dark horror atmosphere, pitch black shadows, visceral horror',
     storySeeds: {
       settings: [
         'remote mountain research station cut off by early snowfall, no signal, one exit',
@@ -235,7 +235,7 @@ Choose a case with rich documentation so the 4-part structure can be filled with
     leadIn: "I don't know how to explain what I saw...",
     themeLabel: 'GHOST STORY',
     themeEmoji: '💀',
-    imageStylePrefix: 'horror anime art style, cel shading, 2D illustration, Japanese onryou ghost with long straight black hair covering half the face, pale skull-like grey face with hollow black eye sockets, multiple white ghost masks floating in dark background, pitch black suffocating darkness, traditional Japanese interior, victim frozen in absolute terror, wide horror-struck eyes, supernatural entity emerging from deep shadow, Juon Ring style, highly detailed, masterpiece',
+    imageStylePrefix: 'manhwa webtoon illustration style, Solo Leveling art style, bishounen handsome East Asian male, pale porcelain white skin, messy dark hair with individual strands, soft gradient shading, clean digital art, Japanese onryou ghost with long straight black hair covering half the face, pale skull-like grey face with hollow black eye sockets, pitch black suffocating darkness, traditional Japanese interior, victim frozen in absolute terror, supernatural entity emerging from deep shadow, highly detailed, masterpiece',
     storySeeds: {
       settings: [
         '1970s apartment block in Hong Kong — narrow corridors, paper-thin walls, twelfth floor, lift that stops on its own',
@@ -315,6 +315,7 @@ BANNED CONTENT:
   {
     id: 'dark_fantasy',
     name: 'Dark Fantasy Adventure',
+    imageStylePrefix: 'manhwa webtoon illustration style, Solo Leveling art style, bishounen handsome East Asian male, pale porcelain white skin, messy dark hair with individual strands, soft gradient shading, clean digital art, dark fantasy atmosphere, dramatic lighting, rich deep colors, highly detailed',
     stylePrompt:
       'anime art style, soft volumetric lighting, warm inner glow, dark atmospheric background, expressive facial features, rich deep colors, dramatic shadows, high quality illustration, 8k, cinematic composition, magic particles, dragons, ancient temple, swords',
     voiceTone: 'epic and theatrical, grand storytelling tone',

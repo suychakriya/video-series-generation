@@ -14,6 +14,7 @@ import {
   saveRunStats,
 } from '../database';
 import { postVideoToFacebook, postPreviousPartsComment } from '../facebook';
+import { postVideoToTikTok } from '../tiktok';
 import { deleteVideoFiles, deleteFromDrive, downloadFromDrive } from '../storage';
 import {
   uploadMainVideo,
@@ -44,7 +45,7 @@ async function resolveFile(
   throw new Error(`File not found on disk (${diskPath}) and no URL available.`);
 }
 
-export async function runPost(facebookOnly = false, youtubeOnly = false): Promise<void> {
+export async function runPost(facebookOnly = false, youtubeOnly = false, tiktokOnly = false): Promise<void> {
   console.log('\nStarting daily post pipeline...');
 
   if (process.env.TEST_MODE === 'true') {
@@ -100,19 +101,24 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
     }
   }
 
-  const label = facebookOnly ? ' [Facebook only]' : youtubeOnly ? ' [YouTube only]' : '';
+  const label = facebookOnly ? ' [Facebook only]' : youtubeOnly ? ' [YouTube only]' : tiktokOnly ? ' [TikTok only]' : '';
   console.log(`Posting: "${story.title}" (Part ${story.part}/4)${label}`);
 
   const theme = getThemeById(story.theme);
 
-  let fbStatus = youtubeOnly ? 'skipped' : 'pending';
-  let ytStatus = facebookOnly ? 'skipped' : 'pending';
-  let khmerFbStatus = (youtubeOnly || !localKhmerFbVideoPath) ? 'skipped' : 'pending';
+  const skipFb = youtubeOnly || tiktokOnly;
+  const skipYt = facebookOnly || tiktokOnly;
+  const skipTt = facebookOnly || youtubeOnly;
 
-  const [fbResult, ytResult, khmerFbResult] = await Promise.allSettled([
+  let fbStatus = skipFb ? 'skipped' : 'pending';
+  let ytStatus = skipYt ? 'skipped' : 'pending';
+  let ttStatus = skipTt ? 'skipped' : 'pending';
+  let khmerFbStatus = (skipFb || !localKhmerFbVideoPath) ? 'skipped' : 'pending';
+
+  const [fbResult, ytResult, khmerFbResult, ttResult] = await Promise.allSettled([
     // FACEBOOK TASK
     (async () => {
-      if (youtubeOnly) return null;
+      if (skipFb) return null;
 
       console.log('\nPosting to Facebook...');
       const fbCaption = `${story.youtube_title}\n${story.facebook_caption}`;
@@ -151,7 +157,7 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
 
     // YOUTUBE TASK
     (async () => {
-      if (facebookOnly) return null;
+      if (skipYt) return null;
 
       console.log('\nUploading to YouTube...');
 
@@ -227,7 +233,7 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
 
     // KHMER FACEBOOK TASK
     (async () => {
-      if (youtubeOnly || !localKhmerFbVideoPath) return null;
+      if (skipFb || !localKhmerFbVideoPath) return null;
 
       console.log('\nPosting Khmer video to Facebook...');
       const khmerCaption = story.khmer_facebook_caption;
@@ -265,6 +271,22 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
 
       return result;
     })(),
+
+    // TIKTOK TASK — uses the Facebook (portrait) video
+    (async () => {
+      if (skipTt || !process.env.TIKTOK_CLIENT_KEY) return null;
+
+      console.log('\nPosting to TikTok...');
+      const ttCaption = `${story.youtube_title}\n${story.facebook_caption}`;
+      const result = await postVideoToTikTok(localFbVideoPath, ttCaption);
+      await updateStoryPart(story.id!, {
+        tiktok_post_id: result.postId,
+        tiktok_post_url: result.postUrl,
+      });
+      ttStatus = 'success';
+      console.log(`  TikTok posted: ${result.postUrl}`);
+      return result;
+    })(),
   ]);
 
   const fbData = fbResult.status === 'fulfilled' ? fbResult.value : null;
@@ -278,10 +300,13 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
   if (khmerFbResult.status === 'rejected') {
     console.error('  Khmer Facebook error:', (khmerFbResult.reason as Error).message);
   }
+  if (ttResult.status === 'rejected') {
+    console.error('  TikTok error:', (ttResult.reason as Error).message);
+  }
+  const ttData = ttResult.status === 'fulfilled' ? ttResult.value : null;
 
-  // Only mark as posted and delete video when running without flags (both platforms)
-  // or when both succeeded without partial flags
-  const runningBothPlatforms = !facebookOnly && !youtubeOnly;
+  // Mark as posted when running without platform flags and all active platforms succeeded
+  const runningBothPlatforms = !facebookOnly && !youtubeOnly && !tiktokOnly;
   const bothSucceeded =
     fbResult.status === 'fulfilled' && ytResult.status === 'fulfilled';
 
@@ -321,4 +346,5 @@ export async function runPost(facebookOnly = false, youtubeOnly = false): Promis
   console.log('\nAll done!');
   if (fbData) console.log(`  Facebook: ${(fbData as any).postUrl}`);
   if (ytData) console.log(`  YouTube: ${ytData.videoUrl}`);
+  if (ttData) console.log(`  TikTok: ${(ttData as any).postUrl}`);
 }

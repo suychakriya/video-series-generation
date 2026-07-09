@@ -58,6 +58,8 @@ export interface StoryRecord {
   khmer_facebook_video_path?: string;
   khmer_facebook_post_id?: string;
   khmer_facebook_post_url?: string;
+  tiktok_post_id?: string;
+  tiktok_post_url?: string;
   comment_posted?: boolean;
   posted?: boolean;
   post_date?: string;

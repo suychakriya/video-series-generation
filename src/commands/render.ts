@@ -28,18 +28,19 @@ function loadImagesForPart(storyId: string, partNum: number): ImageResult[] {
 
   console.log(`  Found ${files.length} images: ${files[0]} … ${files[files.length - 1]}`);
 
-  return files.map((f, i) => {
+  return files.map((f) => {
     const localPath = path.join(imageDir, f);
     const sceneNum = parseInt(f.match(/scene_(\d+)/)![1]);
     const imgNum = parseInt(f.match(/scene_\d+_(\d+)/)![1]);
-    const sceneIndex = sceneNum;
+    const clipPath = path.join(imageDir, `scene_${sceneNum}_clip_${imgNum}.mp4`);
+    const hasClip = fs.existsSync(clipPath);
     return {
       url: localPath,
       localPath,
-      clipPath: localPath,
-      isVideo: false,
+      clipPath: hasClip ? clipPath : localPath,
+      isVideo: hasClip,
       source: 'huggingface' as const,
-      sceneIndex,
+      sceneIndex: sceneNum,
     };
   });
 }

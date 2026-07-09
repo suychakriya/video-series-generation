@@ -64,8 +64,10 @@ export async function runImages(partArg?: number, storyArg?: string): Promise<vo
     );
 
     console.log(`  Generating hook image...`);
+    // Part 4 has no ending hook — use opening_hook so the image has actual scene text
+    const hookText = record.hook || record.opening_hook || '';
     await generateHookImage(
-      record.hook,
+      hookText,
       record.style_prompt,
       record.character_description,
       record.image_seed,

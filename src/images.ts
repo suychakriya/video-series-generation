@@ -10,19 +10,27 @@ const LOCAL_MODEL_URL = process.env.LOCAL_MODEL_URL; // Colab/RunPod server
 // Strips entity/character content phrases from stylePrompt for non-entity scenes.
 // Keeps art style, lighting, color palette, and quality modifiers only.
 function filterStyleForScene(stylePrompt: string, showEntity: boolean): string {
-  if (showEntity) return stylePrompt.trim();
+  // Always strip "writing" / "calligraphy" / "text" tokens — they cause FLUX to render
+  // Asian characters on walls and signs regardless of the no-text negative prompt.
+  const textWords = /\bwriting\b|\bcalligraph|\bscript\b|\binscription|\blettering|\btext on/i;
 
-  // For non-entity scenes, keep only art style, lighting, color, and quality tokens.
-  // Strip anything describing characters, monsters, blood, gore, or horror content.
-  const contentWords = /ghost|skeleton|monster|entity|creature|decompos|corpse|blood|gore|decaying|rotting|supernatural|protagonist|frozen with|wide.*eye|hollow|socket|vein|flesh|cracked.*skin|broken jaw|matted hair|burial|dead body|pale.*rotting|terror|horrif|visceral horror/i;
+  const base = showEntity ? stylePrompt.trim() : (() => {
+    // For non-entity scenes, also strip character, monster, blood, and gore tokens.
+    const contentWords = /ghost|skeleton|monster|entity|creature|decompos|corpse|blood|gore|decaying|rotting|supernatural|protagonist|frozen with|wide.*eye|hollow|socket|vein|flesh|cracked.*skin|broken jaw|matted hair|burial|dead body|pale.*rotting|terror|horrif|visceral horror/i;
+    return stylePrompt
+      .split(',')
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0 && !contentWords.test(t))
+      .join(', ') || stylePrompt.trim();
+  })();
 
-  const filtered = stylePrompt
+  const filtered = base
     .split(',')
     .map((t) => t.trim())
-    .filter((t) => t.length > 0 && !contentWords.test(t))
+    .filter((t) => t.length > 0 && !textWords.test(t))
     .join(', ');
 
-  return filtered || stylePrompt.trim();
+  return filtered || base;
 }
 
 // Returns the character description if the scene should show the character, empty string otherwise.
@@ -35,13 +43,56 @@ function characterWeightForScene(
 ): string {
   // Use Claude's explicit flag if available
   if (showCharacter === false) return '';
-  if (showCharacter === true) return characterDescription.slice(0, 120).trim();
+  if (showCharacter === true) return buildCharacterAnchor(characterDescription, 350);
 
   // Legacy fallback: heuristic for stories generated before show_character was added
   const lower = sceneDescription.toLowerCase();
   const hasCharacterAction = /\b(he|his|him|man|boy|stands?|kneels?|raises?|holds?|stares?|faces?|rushes?|trembles?|reaches?|grabs?|turns?|looks?|walks?|runs?|falls?|rises?|sits?|lies?|watches?|gazes?|clutches?|steps?|leans?|crouches?|sprints?|freezes?|spins?|slams?|opens?|closes?|speaks?|shouts?|whispers?|cries?|smiles?|frowns?)\b/.test(lower);
   if (!hasCharacterAction) return '';
-  return characterDescription.slice(0, 120).trim();
+  return buildCharacterAnchor(characterDescription, 350);
+}
+
+// Pulls out the identity-anchor traits (face/skin, hair, clothing, + extra patterns like
+// hands or scars) from a physical description regardless of where they fall in the string,
+// and caps the result. A blind slice(0, N) truncates whatever comes last — usually
+// hair/clothing/hand/scar details — so the subject gets a different hairstyle, outfit, or
+// distinguishing feature invented fresh on every scene instead of looking the same throughout
+// the story.
+function buildDescriptionAnchor(
+  description: string,
+  maxChars: number,
+  extraPatterns: RegExp[] = []
+): string {
+  const parts = description.split(',').map((p) => p.trim()).filter(Boolean);
+  const corePart = parts.slice(0, 3); // face/skin/build — usually listed first
+  const hairPart = parts.find((p) => /hair/i.test(p));
+  const clothingPart = parts.find((p) =>
+    /wearing|dress|gown|robe|shirt|cloth|garment|jacket|coat|uniform/i.test(p)
+  );
+  const extraParts = extraPatterns
+    .map((re) => parts.find((p) => re.test(p)))
+    .filter((p): p is string => Boolean(p));
+  const anchored = [...corePart, hairPart, clothingPart, ...extraParts].filter(
+    (p): p is string => Boolean(p)
+  );
+  const seen = new Set<string>();
+  const deduped = anchored.filter((p) => (seen.has(p) ? false : (seen.add(p), true)));
+  const joined = deduped.join(', ');
+  if (joined.length <= maxChars) return joined.trim();
+  // Truncate at the last full segment boundary rather than mid-word.
+  const cut = joined.slice(0, maxChars);
+  const lastComma = cut.lastIndexOf(',');
+  return (lastComma > 0 ? cut.slice(0, lastComma) : cut).trim();
+}
+
+function buildEntityAnchor(entityDescription: string, maxChars: number): string {
+  return buildDescriptionAnchor(entityDescription, maxChars, [/finger|hand|claw|nail/i]);
+}
+
+function buildCharacterAnchor(characterDescription: string, maxChars: number): string {
+  return buildDescriptionAnchor(characterDescription, maxChars, [
+    /scar|tattoo|mole|birthmark|freckle|piercing/i,
+  ]);
 }
 
 // HuggingFace Inference — FLUX.1-schnell (fast, good quality, free tier)
@@ -190,25 +241,38 @@ export async function generateHookImage(
 
   if (fs.existsSync(outputPath)) return outputPath;
 
+  // Strip figurative language and long descriptive clauses — keep only the core visual action
   const cleanHook = hook
     .replace(/\b(like|as)\s+(a|an|the)\s+\w+(\s+\w+){0,3}/gi, '')
+    .replace(/,\s*[^,]{60,}/g, '') // drop long clauses that confuse the image model
     .replace(/\s{2,}/g, ' ')
-    .trim();
+    .trim()
+    .slice(0, 200);
   // Art style only — strip character/monster descriptions so they don't overwhelm the hook scene
-  const rawPrefix = imageStylePrefix || 'anime art style, cel shading, 2D illustration';
+  const rawPrefix = imageStylePrefix || 'manhwa webtoon illustration style, Solo Leveling art style, bishounen handsome East Asian male, pale porcelain white skin, messy dark hair with individual strands, soft gradient shading, clean digital art, sharp defined features';
   const styleOnly = filterStyleForScene(rawPrefix, false);
   const charPart = characterWeightForScene(hook, characterDescription);
   // Only inject ghost if the hook text explicitly references it — otherwise the scene drives the image
   const hookMentionsEntity = /\bshe\b|\bit\b|ghost|figure|entity|creature|shadow|apparit/i.test(hook);
   const entityHint = (hookMentionsEntity && entityDescription)
-    ? entityDescription.split(',').slice(0, 2).join(',').trim()
+    ? buildEntityAnchor(entityDescription, 500)
     : '';
+  // Derive perspective from hook text so it works for any story
+  const entityAbove = /above me|above my|over me|overhead|ceiling|looming/i.test(hook);
+  const entityBehind = /behind me|behind him|at his back|over his shoulder/i.test(hook);
+  const perspectiveHint = entityAbove
+    ? 'view from below looking up, character visible in foreground looking up in terror, entity filling upper frame'
+    : entityBehind
+    ? 'character in foreground not yet seeing entity behind him, entity emerging from shadow behind'
+    : 'cinematic wide shot, character and entity both in frame';
   const prompt = [
-    cleanHook.slice(0, 300),
+    cleanHook,
     charPart ? `consistent character: ${charPart}` : '',
-    entityHint ? `ghost in background: ${entityHint}` : '',
+    entityHint ? `consistent entity, present and clearly visible: ${entityHint}, no horns` : '',
     styleOnly,
-    'cinematic composition, dramatic lighting, intense cliffhanger moment, masterpiece, highly detailed',
+    `${perspectiveHint}, pitch black shadows, cold dim light, organic decomposing ghost flesh, matted stringy hair hanging down, not a carved prop, visceral horror, cinematic composition, masterpiece, highly detailed`,
+    'no extra hands, no floating hands, no disembodied hands, no extra arms, no extra limbs, no duplicate body parts, no phantom limbs, no extra hair floating in frame, no extra faces, no body parts without a body',
+    'no text overlay, no written text, no captions, no subtitles, no watermarks, no posters, no signs with writing, no Asian text, no Chinese characters, no Japanese kanji, no Korean hangul, no calligraphy, no floating UI elements',
   ].filter(Boolean).join(', ');
 
   console.log(`  Generating hook image...`);
@@ -228,7 +292,7 @@ export async function generateHookImage(
 
 export async function fetchImagesForPart(
   partNumber: number,
-  scenes: Array<{ scene_number: number; keywords: string[]; description: string; show_character?: boolean; show_entity?: boolean }>,
+  scenes: Array<{ scene_number: number; keywords: string[]; description: string; show_character?: boolean; show_entity?: boolean; show_second_character?: boolean; secondary_character_description?: string }>,
   stylePrompt: string,
   characterDescription: string,
   imageSeed: number,
@@ -257,28 +321,76 @@ export async function fetchImagesForPart(
 
     // Build prompt once per scene (shared across images)
     // Strip simile/metaphor phrases so the image generator doesn't take them literally
-    const sceneAction = scene.description
+    const rawSceneAction = scene.description
       .replace(/\b(like|as)\s+(a|an|the)\s+\w+(\s+\w+){0,3}/gi, '')
       .replace(/\s{2,}/g, ' ')
       .trim()
       .slice(0, 250);
+    // If the scene shows a close-up of readable text (document, screen, notebook), reframe it
+    // to avoid FLUX hallucinating garbled characters filling the image
+    const hasTextObject = /\b(close[- ]?up|close shot).{0,60}(notebook|journal|letter|screen|document|spreadsheet|log|book|page|diary|note|file|record)/i.test(rawSceneAction)
+      || /\b(notebook|journal|letter|spreadsheet|document|log|diary).{0,40}(showing|displaying|revealing|with text|with writing|open to|filled with)/i.test(rawSceneAction);
+    const sceneAction = hasTextObject
+      ? rawSceneAction + ', viewed from a distance, text not legible, focus on character expression'
+      : rawSceneAction;
     const showEntity = scene.show_entity === true;
     const atmosphere = filterStyleForScene(stylePrompt, showEntity);
     const actionKeywords = scene.keywords.slice(0, 5).join(', ');
     const charPart = characterWeightForScene(scene.description, characterDescription, scene.show_character);
+    // Anchor on face/hair/clothing/hands specifically (not a blind slice) so the entity keeps
+    // the same hairstyle, outfit, and hands across every scene instead of a new one each time.
     const entityPart = (showEntity && entityDescription)
-      ? entityDescription.slice(0, 120).trim()
+      ? buildEntityAnchor(entityDescription, 500)
       : '';
-    const rawStylePrefix = imageStylePrefix || 'anime art style, cel shading, 2D illustration';
+    const rawStylePrefix = imageStylePrefix || 'manhwa webtoon illustration style, Solo Leveling art style, bishounen handsome East Asian male, pale porcelain white skin, messy dark hair with individual strands, soft gradient shading, clean digital art, sharp defined features';
     const stylePrefix = filterStyleForScene(rawStylePrefix, showEntity);
+    // Don't say "solo" when the entity is present — it suppresses the ghost.
+    // For entity scenes, anchor character in foreground with entity visible behind/above.
+    // Prefer Claude's explicit flag (set at story-generation time) over the keyword heuristic —
+    // prose can introduce a second person in unlimited ways a regex can't reliably catch.
+    // Legacy fallback: heuristic for stories generated before show_second_character was added.
+    const hasMultipleCharacters = scene.show_second_character !== undefined
+      ? scene.show_second_character
+      : /\b(two|both|together|each other|facing each other|another (man|woman|person|figure|guard|officer|worker|detective|soldier)|\band\b.{0,40}\b(man|woman|person|figure|guard|officer|worker|detective|soldier)\b|\b(a|an|the)\s+(older|younger|old|young|elderly|other)\s+(man|woman|person|figure|guard|officer|worker|detective|soldier)\b)/i.test(sceneAction);
+    // Without a real description, the second person has nothing for FLUX to render a body
+    // from, and it defaults to just the hand/arm implied by the scene's action verb.
+    const secondaryPart = (hasMultipleCharacters && scene.secondary_character_description)
+      ? scene.secondary_character_description.slice(0, 150).trim()
+      : '';
+    const singleSubjectHint = charPart
+      ? showEntity
+        ? 'character in foreground, supernatural entity visible in scene'
+        : hasMultipleCharacters
+          ? 'two people in frame: protagonist in foreground, a second full-body adult person clearly visible beside or behind him, not just a hand or arm'
+          : 'single male protagonist, solo, one person'
+      : '';
+    // Only block phantom body parts when the description doesn't intentionally include them.
+    const descLower = sceneAction.toLowerCase();
+    const handNegative = /\b(hand|hands|arm|arms|reach|grab|clench|fist|finger|wrist)\b/.test(descLower)
+      ? '' : 'no extra hands, no floating hands, no disembodied hands, no extra arms, no phantom limbs';
+    const hairNegative = /\b(hair flowing|hair spreading|hair floating|hair fills|strands fill)\b/.test(descLower)
+      ? '' : 'no extra hair floating in frame, no disembodied hair';
+    const faceNegative = /\b(two faces|multiple faces|faces appear|face emerges)\b/.test(descLower)
+      ? '' : 'no extra faces, no duplicate faces, no extra eyes';
+
+    // When entity is present, put it first so FLUX gives it full weight.
+    // "consistent entity" mirrors "consistent character" — same keyword anchors visual identity across scenes.
+    const entityFocusHint = (showEntity && !charPart) ? 'entity is the sole subject, fill the frame' : '';
     const prompt = [
       sceneAction,
       actionKeywords,
+      entityPart ? `consistent entity, present and clearly visible: ${entityPart}` : '',
+      entityFocusHint,
       charPart ? `consistent character: ${charPart}` : '',
-      entityPart ? `consistent entity: ${entityPart}` : '',
+      secondaryPart ? `second person present, clearly visible: ${secondaryPart}` : '',
+      singleSubjectHint,
       stylePrefix,
       atmosphere,
       'cinematic composition, rule of thirds, dramatic lighting, masterpiece, highly detailed',
+      handNegative,
+      hairNegative,
+      faceNegative,
+      'no text overlay, no written text, no captions, no subtitles, no watermarks, no posters, no signs with writing, no Asian text, no Chinese characters, no Japanese kanji, no Korean hangul, no calligraphy, no floating UI elements',
     ].filter(Boolean).join(', ');
 
     console.log(`    Prompt: ${prompt.slice(0, 200)}...`);

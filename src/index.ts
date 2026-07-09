@@ -97,10 +97,12 @@ async function main(): Promise<void> {
     case 'post': {
       const facebookOnly = args.includes('--facebook-only');
       const youtubeOnly = args.includes('--youtube-only');
-      if (facebookOnly && youtubeOnly) {
-        throw new Error('Cannot use --facebook-only and --youtube-only together');
+      const tiktokOnly = args.includes('--tiktok-only');
+      const flagCount = [facebookOnly, youtubeOnly, tiktokOnly].filter(Boolean).length;
+      if (flagCount > 1) {
+        throw new Error('Only one platform flag can be used at a time');
       }
-      await runPost(facebookOnly, youtubeOnly);
+      await runPost(facebookOnly, youtubeOnly, tiktokOnly);
       break;
     }
 
@@ -116,8 +118,9 @@ Commands:
   render [--part 1|2|3|4] [--story <id>]      Render video    (requires images + audio done)
   generate [--part 1|2|3|4] [--story <id>]    Run translate + images + audio + render sequentially
   sync   [--part 1|2|3|4] [--story <id>]      SCP video + thumbnail to Oracle VPS
-  post   [--facebook-only]                     Post today's story to Facebook and/or YouTube
+  post   [--facebook-only]                     Post today's story to Facebook, YouTube, and/or TikTok
          [--youtube-only]
+         [--tiktok-only]
 
 Options:
   --story <id>   Use a specific story (e.g. story_20260416_342). Defaults to latest.
