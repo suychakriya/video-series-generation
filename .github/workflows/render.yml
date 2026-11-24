@@ -24,6 +24,11 @@ jobs:
 
       - name: Render videos
         run: npx ts-node src/index.ts render
+        env:
+          # Default Node heap (~2 GB) is too small for ts-node + webpack bundling + render in one process
+          NODE_OPTIONS: --max-old-space-size=6144
+          # Skip full type-checking at runtime; the TS compiler otherwise stays resident in the heap
+          TS_NODE_TRANSPILE_ONLY: 'true'
 
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
